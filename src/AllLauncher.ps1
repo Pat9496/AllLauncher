@@ -1,4 +1,4 @@
-﻿param
+param
 (
   [Parameter(Position = 0)]
   [string]
@@ -388,349 +388,377 @@ function Say-Something
     [Parameter(Position = 1)]
     $Modifier
   )
-  If (($speak -eq $null) -or ($speak -eq '')) 
-  { 
-    Add-Type -AssemblyName System.Speech
-    $speak = New-Object -TypeName System.Speech.Synthesis.SpeechSynthesizer
-    If ($speak.GetInstalledVoices().VoiceInfo.Name -notcontains 'Microsoft Eva Mobile') 
-    {
-      Invoke-Item -Path "$CurrentDir\src\Microsoft-Eva-Mobile.reg"
-      Wait-Process -Name regedit
-      $speak.SelectVoice('Microsoft Eva Mobile')
-    }
-    If ($speak.GetInstalledVoices().VoiceInfo.Name -contains 'Microsoft Eva Mobile') 
-    {
-      $speak.SelectVoice('Microsoft Eva Mobile')
-    }
-    $speak.Volume = 100
-    $speak.Rate = 0
-  }
-  
-  $SayThis = ''
-  
-  $SystemPronounciation = $System
-  If ($System -eq 'MAME') 
+  If ($TTSFeature -eq $true) 
   {
-    $SystemPronounciation = 'Arcade'
-  }
-  If ($System -eq 'DOS') 
-  {
-    $SystemPronounciation = 'DOSS'
-  }
-  If ($System -eq 'C64') 
-  {
-    $SystemPronounciation = 'Commodore 64'
-  }
-  If ($System -eq 'SNES') 
-  {
-    $SystemPronounciation = 'Super Nintendo'
-  }
-  If ($System -eq 'NES') 
-  {
-    $SystemPronounciation = 'Nintendo Entertainment System'
-  }
-  If ($System -eq 'PCE') 
-  {
-    $SystemPronounciation = 'Turbografix'
-  }
-  If ($System -eq 'PSX') 
-  {
-    $SystemPronounciation = 'Playstation'
-  }
-  If ($System -eq 'PS2') 
-  {
-    $SystemPronounciation = 'Playstation 2'
-  }
+    If (($speak -eq $null) -or ($speak -eq '')) 
+    { 
+      Add-Type -AssemblyName System.Speech
+      $speak = New-Object -TypeName System.Speech.Synthesis.SpeechSynthesizer
+      If ($speak.GetInstalledVoices().VoiceInfo.Name -notcontains 'Microsoft Eva') 
+      {
+        #Invoke-Item -Path "$CurrentDir\src\Microsoft-Eva-Mobile.reg"
+        #Wait-Process -Name regedit
+        $RegKeys = 'Microsoft\Speech', 'Microsoft\Speech_OneCore', 'WOW6432Node\Microsoft\SPEECH'
 
-  If (($SystemPronounciation -eq '') -or ($SystemPronounciation -eq $null)) 
-  {
-    $SystemPronounciation = 'Computer'
-  }
-  If ($SystemPronounciation[0] -match '[aeiou]') 
-  {
-    $SystemPronoun = 'an'
-  }
-  else 
-  {
-    $SystemPronoun = 'a'
-  }
+        ForEach ($RegKey in $RegKeys) 
+        { 
+          New-Item -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM" -ErrorAction SilentlyContinue
+          New-Item -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM" -Name '(Default)' -Value 'Microsoft Eva - English (United States)' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM" -Name '409' -Value 'Microsoft Eva - English (United States)' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM" -Name 'CLSID' -Value '{179F3D56-1B0B-42B2-A962-59B7EF59FE1B}' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM" -Name 'LangDataPath' -Value '%windir%\Speech_OneCore\Engines\TTS\en-US\MSTTSLocenUS.dat' -PropertyType 'ExpandString' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM" -Name 'LangUpdateDataDirectory' -Value '%SystemDrive%\Data\SharedData\Speech_OneCore\Engines\TTS\en-US' -PropertyType 'ExpandString' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM" -Name 'VoicePath' -Value '%windir%\Speech_OneCore\Engines\TTS\en-US\M1033Eva' -PropertyType 'ExpandString' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM" -Name 'VoiceUpdateDataDirectory' -Value '%SystemDrive%\Data\SharedData\Speech_OneCore\Engines\TTS\en-US' -PropertyType 'ExpandString' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -Name 'Age' -Value 'Adult' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -Name 'Gender' -Value 'Female' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -Name 'Version' -Value '11.0' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -Name 'Language' -Value '409' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -Name 'Name' -Value 'Microsoft Eva' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -Name 'SharedPronunciation' -Value '' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -Name 'Vendor' -Value 'Microsoft' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -Name 'DataVersion' -Value '11.0.2013.1022' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -Name 'SayAsSupport' -Value 'spell=NativeSupported; cardinal=GlobalSupported; ordinal=NativeSupported; date=GlobalSupported; time=GlobalSupported; telephone=NativeSupported; currency=NativeSupported; net=NativeSupported; url=NativeSupported; address=NativeSupported; alphanumeric=NativeSupported; Name=NativeSupported; media=NativeSupported; message=NativeSupported; companyName=NativeSupported; computer=NativeSupported; math=NativeSupported; duration=NativeSupported' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+          New-ItemProperty -Path "HKLM:\SOFTWARE\$RegKey\Voices\Tokens\MSTTS_V110_enUS_EvaM\Attributes" -Name 'PersonalAssistant' -Value '1' -PropertyType 'String' -Force -ErrorAction SilentlyContinue
+        }
   
-  $SayPlease = (Get-Random -Maximum ('', 'Please'))
-  $SaySystem = (Get-Random -Maximum ('', "$SystemPronounciation"))
-
-  If ($About -eq 'Nothing') 
-  {
-    $SayThis = ''
-  }
-  
-  If ($About -eq 'Greeting') 
-  { 
-    If (($Game -eq 'AllLauncher Menu') -or ($Game -eq '') -or ($Game -eq $null))
-    {
-      $NormalGreeting = Get-Random -Maximum ('Hello', 'Greetings', 'Welcome', 'Hello', 'Hey there', 'Hi there', 'Hi')
-      $Greeting = $NormalGreeting
-      If ([int](Get-Date -Format HH) -lt 9) 
-      {
-        $Greeting = Get-Random -Maximum ($NormalGreeting, 'Good Morning')
+        #$speak.SelectVoice('Microsoft Eva')
+        $speak.Speak('Voice installation complete. New voice will be used next time you reboot your system.')
       }
-      If ([int](Get-Date -Format HH) -lt 7) 
+      If ($speak.GetInstalledVoices().VoiceInfo.Name -contains 'Microsoft Eva') 
       {
-        $Greeting = 'Good Morning'
+        $speak.SelectVoice('Microsoft Eva')
       }
-      If ([int](Get-Date -Format HH) -gt 20) 
-      {
-        $Greeting = Get-Random -Maximum ($NormalGreeting, 'Good Evening')
-      }
-      If ([int](Get-Date -Format HH) -gt 22) 
-      {
-        $Greeting = 'Good Evening'
-      }
-      
-      $Callsign = Get-Random -Maximum ('', $env:Username, 'Sir')
-      $Today = Get-Random -Maximum ('Today is', "It's", 'It is', "Today's")
-      $TodaysDay = Get-Date -Format 'dddd'
-      $TodaysDate = (Get-Date -Format ' d').Replace(' ','')
-      $MonthAndYear = Get-Date -Format 'MMMM yyyy'
-      $DatesTH = 'th'
-      If (($TodaysDate[-1] -eq 3) -or ($TodaysDate[-1] -eq '3')) 
-      {
-        $DatesTH = 'rd'
-      }
-      If (($TodaysDate[-1] -eq 2) -or ($TodaysDate[-1] -eq '2')) 
-      {
-        $DatesTH = 'nd'
-      }
-      If (($TodaysDate[-1] -eq 1) -or ($TodaysDate[-1] -eq '1') -or ($TodaysDate -eq '11') -or ($TodaysDate -eq '12') -or ($TodaysDate -eq '13')) 
-      {
-        $DatesTH = 'st'
-      }
-      If (($TodaysDate -eq 11) -or ($TodaysDate -eq 12) -or ($TodaysDate -eq 13)) 
-      {
-        $DatesTH = 'th'
-      }
-            
-      $SayThis = ("$Greeting $Callsign. - $Today $TodaysDay, the $TodaysDate$DatesTH of $MonthAndYear.")
-    }
-    else
-    {
-      $speak.Rate = -1
-      $speak.Speak(((Get-Random -Maximum ('Starting', 'Initiating', ' ', 'Readying', 'Loading', 'Preparing', 'Launching', 'Opening'))))
-      $speak.Rate = -2
-      $speak.Speak("$GameName")
+      $speak.Volume = 100
       $speak.Rate = 0
+    }
+  
+    $SayThis = ''
+  
+    $SystemPronounciation = $System
+    If ($System -eq 'MAME') 
+    {
+      $SystemPronounciation = 'Arcade'
+    }
+    If ($System -eq 'DOS') 
+    {
+      $SystemPronounciation = 'DOSS'
+    }
+    If ($System -eq 'C64') 
+    {
+      $SystemPronounciation = 'Commodore 64'
+    }
+    If ($System -eq 'SNES') 
+    {
+      $SystemPronounciation = 'Super Nintendo'
+    }
+    If ($System -eq 'NES') 
+    {
+      $SystemPronounciation = 'Nintendo Entertainment System'
+    }
+    If ($System -eq 'PCE') 
+    {
+      $SystemPronounciation = 'Turbografix'
+    }
+    If ($System -eq 'PSX') 
+    {
+      $SystemPronounciation = 'Playstation'
+    }
+    If ($System -eq 'PS2') 
+    {
+      $SystemPronounciation = 'Playstation 2'
+    }
+
+    If (($SystemPronounciation -eq '') -or ($SystemPronounciation -eq $null)) 
+    {
+      $SystemPronounciation = 'Computer'
+    }
+    If ($SystemPronounciation[0] -match '[aeiou]') 
+    {
+      $SystemPronoun = 'an'
+    }
+    else 
+    {
+      $SystemPronoun = 'a'
+    }
+  
+    $SayPlease = (Get-Random -Maximum ('', 'Please'))
+    $SaySystem = (Get-Random -Maximum ('', "$SystemPronounciation"))
+
+    If ($About -eq 'Nothing') 
+    {
       $SayThis = ''
     }
-  }
+  
+    If ($About -eq 'Greeting') 
+    { 
+      If (($Game -eq 'AllLauncher Menu') -or ($Game -eq '') -or ($Game -eq $null))
+      {
+        $NormalGreeting = Get-Random -Maximum ('Hello', 'Greetings', 'Welcome', 'Hello', 'Hey there', 'Hi there', 'Hi')
+        $Greeting = $NormalGreeting
+        If ([int](Get-Date -Format HH) -lt 9) 
+        {
+          $Greeting = Get-Random -Maximum ($NormalGreeting, 'Good Morning')
+        }
+        If ([int](Get-Date -Format HH) -lt 7) 
+        {
+          $Greeting = 'Good Morning'
+        }
+        If ([int](Get-Date -Format HH) -gt 20) 
+        {
+          $Greeting = Get-Random -Maximum ($NormalGreeting, 'Good Evening')
+        }
+        If ([int](Get-Date -Format HH) -gt 22) 
+        {
+          $Greeting = 'Good Evening'
+        }
+      
+        $Callsign = Get-Random -Maximum ('', $env:Username, 'Sir')
+        $Today = Get-Random -Maximum ('Today is', "It's", 'It is', "Today's")
+        $TodaysDay = Get-Date -Format 'dddd'
+        $TodaysDate = (Get-Date -Format ' d').Replace(' ','')
+        $MonthAndYear = Get-Date -Format 'MMMM yyyy'
+        $DatesTH = 'th'
+        If (($TodaysDate[-1] -eq 3) -or ($TodaysDate[-1] -eq '3')) 
+        {
+          $DatesTH = 'rd'
+        }
+        If (($TodaysDate[-1] -eq 2) -or ($TodaysDate[-1] -eq '2')) 
+        {
+          $DatesTH = 'nd'
+        }
+        If (($TodaysDate[-1] -eq 1) -or ($TodaysDate[-1] -eq '1') -or ($TodaysDate -eq '11') -or ($TodaysDate -eq '12') -or ($TodaysDate -eq '13')) 
+        {
+          $DatesTH = 'st'
+        }
+        If (($TodaysDate -eq 11) -or ($TodaysDate -eq 12) -or ($TodaysDate -eq 13)) 
+        {
+          $DatesTH = 'th'
+        }
+            
+        $SayThis = ("$Greeting $Callsign. - $Today $TodaysDay, the $TodaysDate$DatesTH of $MonthAndYear.")
+      }
+      else
+      {
+        $speak.Rate = -1
+        $speak.Speak(((Get-Random -Maximum ('Starting', 'Initiating', ' ', 'Readying', 'Loading', 'Preparing', 'Launching', 'Opening'))))
+        $speak.Rate = -2
+        $speak.Speak("$GameName")
+        $speak.Rate = 0
+        $SayThis = ''
+      }
+    }
 
-  If ($About -eq 'ReturnToLauncher') 
-  {
-    $ReturningTo = (Get-Random -Maximum ('Returning to', 'Going back to', 'Reloading', 'Back to', 'Reverting to', 'And now back to', 'reopening', 'restarting'))
-    $IsRestarting = (Get-Random -Maximum ('is restarting', 'is reloading', 'is returning', 'is coming back'))
-    $SayThis = (Get-Random -Maximum ("$ReturningTo $LauncherName.", "$LauncherName $IsRestarting.", "Displaying $LauncherName again.", "Showing $LauncherName again."))
-  }
+    If ($About -eq 'ReturnToLauncher') 
+    {
+      $ReturningTo = (Get-Random -Maximum ('Returning to', 'Going back to', 'Reloading', 'Back to', 'Reverting to', 'And now back to', 'reopening', 'restarting'))
+      $IsRestarting = (Get-Random -Maximum ('is restarting', 'is reloading', 'is returning', 'is coming back'))
+      $SayThis = (Get-Random -Maximum ("$ReturningTo $LauncherName.", "$LauncherName $IsRestarting.", "Displaying $LauncherName again.", "Showing $LauncherName again."))
+    }
 
-  If ($About -eq 'StartLauncher') 
-  {
-    $ReturningTo = (Get-Random -Maximum ('Starting', 'Opening', 'Loading', "Let's go to", 'Displaying', 'Initializing', 'Showing', 'Starting', 'Loading'))
-    $IsRestarting = (Get-Random -Maximum ('is starting', 'is loading', 'is opening', 'is initializing'))
-    $SayThis = (Get-Random -Maximum ("$ReturningTo $LauncherName.", "$LauncherName $IsRestarting."))
-  }
+    If ($About -eq 'StartLauncher') 
+    {
+      $ReturningTo = (Get-Random -Maximum ('Starting', 'Opening', 'Loading', "Let's go to", 'Displaying', 'Initializing', 'Showing', 'Starting', 'Loading'))
+      $IsRestarting = (Get-Random -Maximum ('is starting', 'is loading', 'is opening', 'is initializing'))
+      $SayThis = (Get-Random -Maximum ("$ReturningTo $LauncherName.", "$LauncherName $IsRestarting."))
+    }
   
-  If ($About -eq 'ReadyVR') 
-  {
-    $MakingSure = (Get-Random -Maximum ('Making sure', 'Making certain', 'Checking that'))
-    $VRis = (Get-Random -Maximum ('is ready', 'is working correctly', 'is prepared', 'is initialized', 'drivers are loaded.'))
-    $SayThis = (Get-Random -Maximum ("$MakingSure VR hardware $VRis.", 'Checking VR hardware readyness...', 'Checking status of VR hardware....'))
-  }
+    If ($About -eq 'ReadyVR') 
+    {
+      $MakingSure = (Get-Random -Maximum ('Making sure', 'Making certain', 'Checking that'))
+      $VRis = (Get-Random -Maximum ('is ready', 'is working correctly', 'is prepared', 'is initialized', 'drivers are loaded.'))
+      $SayThis = (Get-Random -Maximum ("$MakingSure VR hardware $VRis.", 'Checking VR hardware readyness...', 'Checking status of VR hardware....'))
+    }
   
-  If ($About -eq 'StartOculusClient') 
-  {
-    $SayThis = (Get-Random -Maximum ('Starting Oculus Client...', 'Starting Client for Oculus Rift...', 'Starting Oculus Rift Client...', 'Starting Oculus Client...'))
-  }
+    If ($About -eq 'StartOculusClient') 
+    {
+      $SayThis = (Get-Random -Maximum ('Starting Oculus Client...', 'Starting Client for Oculus Rift...', 'Starting Oculus Rift Client...', 'Starting Oculus Client...'))
+    }
   
-  If ($About -eq 'StartOculusServices') 
-  {
-    $SayThis = (Get-Random -Maximum ('Starting Oculus services...', 'Starting Oculus Rift services...', 'Starting services for Oculus Rift...', 'Oculus Rift services are being started...', 'Oculus services are being started...'))
-  }
+    If ($About -eq 'StartOculusServices') 
+    {
+      $SayThis = (Get-Random -Maximum ('Starting Oculus services...', 'Starting Oculus Rift services...', 'Starting services for Oculus Rift...', 'Oculus Rift services are being started...', 'Oculus services are being started...'))
+    }
   
-  If ($About -eq 'RestartOculus') 
-  {
-    $SayThis = (Get-Random -Maximum ('Restarting both Oculus services and Oculus Client...', 'Trying to restart Oculus services and Oculus Client...', 'Restarting Oculus Rift services and Client...'))
-  }
+    If ($About -eq 'RestartOculus') 
+    {
+      $SayThis = (Get-Random -Maximum ('Restarting both Oculus services and Oculus Client...', 'Trying to restart Oculus services and Oculus Client...', 'Restarting Oculus Rift services and Client...'))
+    }
 
-  If ($About -eq 'StartSteamVR') 
-  {  
-    $SVRneeded = (Get-Random -Maximum ('needed', 'required', 'necessary', 'demanded', 'essential'))
-    $SVRneeds = (Get-Random -Maximum ('needs', 'requires', 'demands', 'uses'))
-    $SVRstart = (Get-Random -Maximum ('starting', 'loading'))
-    $SayThis = (Get-Random -Maximum ("$SVRstart Steam VR...", "Game $SVRneeds Steam VR. $SVRstart it...", "Steam VR $SVRneeded. $SVRstart it...", "$GameName $SVRneeds Steam VR. $SVRstart it..."))
-  }
+    If ($About -eq 'StartSteamVR') 
+    {  
+      $SVRneeded = (Get-Random -Maximum ('needed', 'required', 'necessary', 'demanded', 'essential'))
+      $SVRneeds = (Get-Random -Maximum ('needs', 'requires', 'demands', 'uses'))
+      $SVRstart = (Get-Random -Maximum ('starting', 'loading'))
+      $SayThis = (Get-Random -Maximum ("$SVRstart Steam VR...", "Game $SVRneeds Steam VR. $SVRstart it...", "Steam VR $SVRneeded. $SVRstart it...", "$GameName $SVRneeds Steam VR. $SVRstart it..."))
+    }
   
-  If ($About -eq 'SteamVRLoaded') 
-  {  
-    $SVRloaded = (Get-Random -Maximum ('loaded', 'ready', 'prepared'))
-    $SVRfinally = (Get-Random -Maximum ('', 'now', 'finally'))
-    $SVRstartG = (Get-Random -Maximum ('starting', 'loading', 'entering'))
-    $SayThis = "Steam VR $SVRloaded. $SVRfinally $SVRstartG game."
-  }
+    If ($About -eq 'SteamVRLoaded') 
+    {  
+      $SVRloaded = (Get-Random -Maximum ('loaded', 'ready', 'prepared'))
+      $SVRfinally = (Get-Random -Maximum ('', 'now', 'finally'))
+      $SVRstartG = (Get-Random -Maximum ('starting', 'loading', 'entering'))
+      $SayThis = "Steam VR $SVRloaded. $SVRfinally $SVRstartG game."
+    }
   
-  If ($About -eq 'OpenGameDocs') 
-  {
-    $GDOpening = (Get-Random -Maximum ('Opening', 'Displaying', 'Readying', 'Loading', 'Preparing'))
-    $SayThis = (Get-Random -Maximum ("$GDOpening game documents.", "$GDOpening multiple documents.", "There are several game documents. $GDOpening them.", "Several game documents found. $GDOpening them.", "Multiple game documents found. $GDOpening them."))
-  }
+    If ($About -eq 'OpenGameDocs') 
+    {
+      $GDOpening = (Get-Random -Maximum ('Opening', 'Displaying', 'Readying', 'Loading', 'Preparing'))
+      $SayThis = (Get-Random -Maximum ("$GDOpening game documents.", "$GDOpening multiple documents.", "There are several game documents. $GDOpening them.", "Several game documents found. $GDOpening them.", "Multiple game documents found. $GDOpening them."))
+    }
     
-  If ($About -eq 'OpenOneGameDoc') 
-  {
-    $GDOpening = (Get-Random -Maximum ('Opening', 'Displaying', 'Readying', 'Loading', 'Preparing'))
-    $SayThis = (Get-Random -Maximum ("$GDOpening game document.", "$GDOpening a document.", "There is a game document. $GDOpening it.", "One game document found. $GDOpening it.", "A single game document has been found. $GDOpening it."))
-  }
+    If ($About -eq 'OpenOneGameDoc') 
+    {
+      $GDOpening = (Get-Random -Maximum ('Opening', 'Displaying', 'Readying', 'Loading', 'Preparing'))
+      $SayThis = (Get-Random -Maximum ("$GDOpening game document.", "$GDOpening a document.", "There is a game document. $GDOpening it.", "One game document found. $GDOpening it.", "A single game document has been found. $GDOpening it."))
+    }
   
-  If ($About -eq 'OpenGameWebpage') 
-  {
-    $SayThis = (Get-Random -Maximum ("Opening game web page$Modifier...", "Displaying game web page$Modifier...", "Readying game web page$Modifier...", "Opening game URL$Modifier..."))
-  }
+    If ($About -eq 'OpenGameWebpage') 
+    {
+      $SayThis = (Get-Random -Maximum ("Opening game web page$Modifier...", "Displaying game web page$Modifier...", "Readying game web page$Modifier...", "Opening game URL$Modifier..."))
+    }
     
-  If ($About -eq 'OpenGameTool') 
-  {
-    $SayThis = (Get-Random -Maximum ("Opening game related link$Modifier...", "Opening game related shortcut$Modifier...", "Readying additional game tool$Modifier..."))
-  }
-  
-  If ($About -eq 'OpenUHS') 
-  {
-    $SayThis = (Get-Random -Maximum ('Opening universal hint system file...', 'U H S file found. Opening it...', 'Displaying Universal Hint System file...', 'Opening U H S file...'))
-  }
-  
-  If ($About -eq 'LoadTrainer') 
-  {
-    $TrainerLoading = (Get-Random -Maximum ('Loading', 'Activating', 'Starting', 'Initializing'))
-    $SayThis = (Get-Random -Maximum ("$TrainerLoading trainer.", "Trainer is $TrainerLoading.", "Trainer found. $TrainerLoading it."))
-  }
-  
-  If ($About -eq 'LoadCheatTable') 
-  {
-    $TableLoading = (Get-Random -Maximum ('Loading', 'Opening'))
-    $SayThis = (Get-Random -Maximum ("$TableLoading $Modifier table.", "$TableLoading table for $Modifier", "$Modifier table found. $TableLoading it."))
-  }
-
-  If ($About -eq 'MountDisc') 
-  {
-    $SayThis = (Get-Random -Maximum ("Mounting disc-Image$Modifier...", "Mounting ISO-Image$Modifier...", "Disc-Image$Modifier found. Mounting...", "ISO-Image$Modifier found. Mounting...", "Mounting CD or DVD image$Modifier...", "CD or DVD Image$Modifier found. Mounting..."))
-  }
-  
-  If ($About -eq 'TimePlayed') 
-  {
-    $TPtime = [timespan]$ThisPlayed
-    $TPhave = (Get-Random -Maximum ('', 'have'))
-    $TPgame = (Get-Random -Maximum ('', 'the game'))
-    $SayThis = (Get-Random -Maximum ("You $TPhave played $TPgame for $TPtime.", "You were playing $TPgame for $TPtime", "The game ran for $TPtime."))
-  }
-
-  If ($About -eq 'TotalTimePlayed') 
-  {
-    $TTPintotal = (Get-Random -Maximum ('', 'In total,'))
-    $TTPplayed = (Get-Random -Maximum ('played', 'have played', 'have been playing'))
-    $TTPgame = (Get-Random -Maximum ('the game', $GameName, 'this game'))
-    $SayThis = (Get-Random -Maximum ("$TTPintotal you $TTPplayed $TTPgame for more than $TotalHours hours.", "You now spent more than $TotalHours hours with $TTPgame.", "$TTPintotal you $TTPplayed $TTPgame for more than $TotalHours hours."))
-  }
-
-
-  If ($About -eq 'StartGame') 
-  {
-    $SGStarting = (Get-Random -Maximum ('Starting', 'Loading', 'Initiating', 'Activating', 'Ready for', 'Playing'))
-    $SGReady = (Get-Random -Maximum ('ready', 'initialized', 'prepared'))
-    $StartingSpeech = (Get-Random -Maximum ("$SGStarting $SaySystem game...", "$SGStarting $GameName...", "System $SGReady."))
-    $SayThis = $StartingSpeech
-    If (($System -ne 'Windows') -and ($System -ne 'VR') -and ($System -ne 'Computer')) 
+    If ($About -eq 'OpenGameTool') 
     {
-      $StartingEmu = "$SGStarting $SaySystem emulator..."
-      $SayThis = (Get-Random -Maximum ($StartingSpeech, $StartingEmu, $StartingSpeech))
+      $SayThis = (Get-Random -Maximum ("Opening game related link$Modifier...", "Opening game related shortcut$Modifier...", "Readying additional game tool$Modifier..."))
     }
-    If ($EmulatorINIEntry -like '*.dll') 
+  
+    If ($About -eq 'OpenUHS') 
     {
-      $StartingRA = "$SGStarting RetroArch..."
-      $SayThis = (Get-Random -Maximum ($StartingSpeech, $StartingEmu, $StartingSpeech, $StartingRA))
+      $SayThis = (Get-Random -Maximum ('Opening universal hint system file...', 'U H S file found. Opening it...', 'Displaying Universal Hint System file...', 'Opening U H S file...'))
     }
-    If ($EmulatorINIEntry -eq 'mednafen') 
+  
+    If ($About -eq 'LoadTrainer') 
     {
-      $StartingME = "$SGStarting Mednafen..."
-      $SayThis = (Get-Random -Maximum ($StartingSpeech, $StartingEmu, $StartingSpeech, $StartingME))      
+      $TrainerLoading = (Get-Random -Maximum ('Loading', 'Activating', 'Starting', 'Initializing'))
+      $SayThis = (Get-Random -Maximum ("$TrainerLoading trainer.", "Trainer is $TrainerLoading.", "Trainer found. $TrainerLoading it."))
     }
-  }
+  
+    If ($About -eq 'LoadCheatTable') 
+    {
+      $TableLoading = (Get-Random -Maximum ('Loading', 'Opening'))
+      $SayThis = (Get-Random -Maximum ("$TableLoading $Modifier table.", "$TableLoading table for $Modifier", "$Modifier table found. $TableLoading it."))
+    }
+
+    If ($About -eq 'MountDisc') 
+    {
+      $SayThis = (Get-Random -Maximum ("Mounting disc-Image$Modifier...", "Mounting ISO-Image$Modifier...", "Disc-Image$Modifier found. Mounting...", "ISO-Image$Modifier found. Mounting...", "Mounting CD or DVD image$Modifier...", "CD or DVD Image$Modifier found. Mounting..."))
+    }
+  
+    If ($About -eq 'TimePlayed') 
+    {
+      $TPtime = [timespan]$ThisPlayed
+      $TPhave = (Get-Random -Maximum ('', 'have'))
+      $TPgame = (Get-Random -Maximum ('', 'the game'))
+      $SayThis = (Get-Random -Maximum ("You $TPhave played $TPgame for $TPtime.", "You were playing $TPgame for $TPtime", "The game ran for $TPtime."))
+    }
+
+    If ($About -eq 'TotalTimePlayed') 
+    {
+      $TTPintotal = (Get-Random -Maximum ('', 'In total,'))
+      $TTPplayed = (Get-Random -Maximum ('played', 'have played', 'have been playing'))
+      $TTPgame = (Get-Random -Maximum ('the game', $GameName, 'this game'))
+      $SayThis = (Get-Random -Maximum ("$TTPintotal you $TTPplayed $TTPgame for more than $TotalHours hours.", "You now spent more than $TotalHours hours with $TTPgame.", "$TTPintotal you $TTPplayed $TTPgame for more than $TotalHours hours."))
+    }
+
+
+    If ($About -eq 'StartGame') 
+    {
+      $SGStarting = (Get-Random -Maximum ('Starting', 'Loading', 'Initiating', 'Activating', 'Ready for', 'Playing'))
+      $SGReady = (Get-Random -Maximum ('ready', 'initialized', 'prepared'))
+      $StartingSpeech = (Get-Random -Maximum ("$SGStarting $SaySystem game...", "$SGStarting $GameName...", "System $SGReady."))
+      $SayThis = $StartingSpeech
+      If (($System -ne 'Windows') -and ($System -ne 'VR') -and ($System -ne 'Computer')) 
+      {
+        $StartingEmu = "$SGStarting $SaySystem emulator..."
+        $SayThis = (Get-Random -Maximum ($StartingSpeech, $StartingEmu, $StartingSpeech))
+      }
+      If ($EmulatorINIEntry -like '*.dll') 
+      {
+        $StartingRA = "$SGStarting RetroArch..."
+        $SayThis = (Get-Random -Maximum ($StartingSpeech, $StartingEmu, $StartingSpeech, $StartingRA))
+      }
+      If ($EmulatorINIEntry -eq 'mednafen') 
+      {
+        $StartingME = "$SGStarting Mednafen..."
+        $SayThis = (Get-Random -Maximum ($StartingSpeech, $StartingEmu, $StartingSpeech, $StartingME))      
+      }
+    }
     
-  If ($About -eq 'Problem') 
-  { 
-    $AProblem = (Get-Random -Maximum ('a problem', 'an issue', 'an error', 'a complication'))
-    $SayThis = (Get-Random -Maximum ("There has been $AProblem.", "There was $AProblem.", "There is $AProblem.", "$AProblem has occured."))
-  }
+    If ($About -eq 'Problem') 
+    { 
+      $AProblem = (Get-Random -Maximum ('a problem', 'an issue', 'an error', 'a complication'))
+      $SayThis = (Get-Random -Maximum ("There has been $AProblem.", "There was $AProblem.", "There is $AProblem.", "$AProblem has occured."))
+    }
   
-  If ($About -eq 'TakesLonger') 
-  {
-    $SayThis = (Get-Random -Maximum ('This takes longer than expected.', 'This takes longer than anticipated.'))
-  }
+    If ($About -eq 'TakesLonger') 
+    {
+      $SayThis = (Get-Random -Maximum ('This takes longer than expected.', 'This takes longer than anticipated.'))
+    }
   
-  If ($About -eq 'Loading') 
-  {
-    $SayThis = (Get-Random -Maximum ('Loading... -', 'Working... -', 'Getting things ready... -', 'Getting ready... -', 'Preparing... -', 'Initializing... -', 'Working on it... -'))
-  }
+    If ($About -eq 'Loading') 
+    {
+      $SayThis = (Get-Random -Maximum ('Loading... -', 'Working... -', 'Getting things ready... -', 'Getting ready... -', 'Preparing... -', 'Initializing... -', 'Working on it... -'))
+    }
 
-  If ($About -eq 'PleaseWait') 
-  {
-    $SayThis = (Get-Random -Maximum ("$SayPlease wait...", "$SayPlease Hold on...", "Just a second $SayPlease...", "$SayPlease Hang in there...", "$SayPlease Stand by...", "$SayPlease Hold tight...", "Patience $SayPlease...", "One moment $SayPlease...", "Just a minute $SayPlease...", "Bear with me $SayPlease..."))
+    If ($About -eq 'PleaseWait') 
+    {
+      $SayThis = (Get-Random -Maximum ("$SayPlease wait...", "$SayPlease Hold on...", "Just a second $SayPlease...", "$SayPlease Hang in there...", "$SayPlease Stand by...", "$SayPlease Hold tight...", "Patience $SayPlease...", "One moment $SayPlease...", "Just a minute $SayPlease...", "Bear with me $SayPlease..."))
+    }
+  
+    If ($About -eq 'OpeningSpeech') 
+    {
+      $OSSaySystem = (Get-Random -Maximum ('', 'system'))
+      $OSPreparingFor = (Get-Random -Maximum ('This is', "Preparing $OSSaySystem for", "Getting $OSSaySystem ready for", "Readying $OSSaySystem for"))
+      $NormalOpening = "$OSPreparingFor $SystemPronoun $SystemPronounciation game."
+      $SayThis = $NormalOpening
+      $MednafenOpening = (Get-Random -Maximum ("Using Mednafen to emulate $SystemPronoun $SystemPronounciation.", "Using Mednafen to emulate $SystemPronoun $SystemPronounciation system."))
+      If (($System -ne 'Windows') -and ($System -ne 'VR') -and ($System -ne 'Computer')) 
+      {
+        $EmulatorOpening = (Get-Random -Maximum ("Emulating $SystemPronoun $SystemPronounciation $OSSaySystem.", "Preparing to emulate $SystemPronoun $SystemPronounciation $OSSaySystem.", "Preparing Emulator for $SystemPronoun $SystemPronounciation $OSSaySystem."))
+        $SayThis = (Get-Random -Maximum ($NormalOpening, $NormalOpening, $EmulatorOpening))
+      }
+      If ($EmulatorINIEntry -like '*.dll') 
+      {
+        $RetroArchOpening = (Get-Random -Maximum ("Using RetroArch to emulate $SystemPronoun $SystemPronounciation $OSSaySystem.", "Preparing RetroArch to emulate $SystemPronoun $SystemPronounciation $OSSaySystem.", "Emulating $SystemPronoun $SystemPronounciation $OSSaySystem with RetroArch.", "Preparing to Emulate $SystemPronoun $SystemPronounciation $OSSaySystem with RetroArch."))
+        $SayThis = (Get-Random -Maximum ($NormalOpening, $NormalOpening, $EmulatorOpening, $RetroArchOpening))
+      }
+      If ($EmulatorINIEntry -eq 'mednafen') 
+      {
+        $MednafenOpening = (Get-Random -Maximum ("Using Mednafen to emulate $SystemPronoun $SystemPronounciation $OSSaySystem.", "Preparing Mednafen to emulate $SystemPronoun $SystemPronounciation $OSSaySystem.", "Emulating $SystemPronoun $SystemPronounciation $OSSaySystem with Mednafen.", "Preparing to Emulate $SystemPronoun $SystemPronounciation $OSSaySystem with Mednafen."))
+        $SayThis = (Get-Random -Maximum ($NormalOpening, $NormalOpening, $EmulatorOpening, $MednafenOpening))
+      }
+    }
+  
+    If ($About -eq 'GameEnded') 
+    {
+      $GEsaySystem = (Get-Random -Maximum ('', "$SystemPronounciation"))
+      $GEgame = 'game'
+      $GEhas = (Get-Random -Maximum ('', 'has', 'has been'))
+      $GEended = (Get-Random -Maximum ('ended', 'finished', 'closed', 'terminated', 'unloaded'))
+      If (($System -ne 'Windows') -and ($System -ne 'VR') -and ($System -ne 'Computer')) 
+      {
+        $GEgame = (Get-Random -Maximum ('game', 'emulator'))
+      }
+      If ($EmulatorINIEntry -like '*.dll')  
+      {
+        $GEgame = (Get-Random -Maximum ('game', 'emulator', 'RetroArch'))
+      }
+      If ($EmulatorINIEntry -eq 'mednafen') 
+      {
+        $GEgame = (Get-Random -Maximum ('game', 'emulator', 'Mednafen'))
+      }
+      $SayThis = (Get-Random -Maximum ("$GEsaySystem $GEgame $GEhas $GEended.", "$GameName $GEhas $GEended.", 'Game Over', "$GEsaySystem $GEgame process $GEhas $GEended." ))
+    }
+  
+    If ($About -eq 'Finished') 
+    {
+      $SayThis = (Get-Random -Maximum ('Finished.', 'Everything is finished.', 'Ending.', 'Done.'))
+    }
+  
+    $speak.Speak($SayThis)
   }
-  
-  If ($About -eq 'OpeningSpeech') 
-  {
-    $OSSaySystem = (Get-Random -Maximum ('', 'system'))
-    $OSPreparingFor = (Get-Random -Maximum ('This is', "Preparing $OSSaySystem for", "Getting $OSSaySystem ready for", "Readying $OSSaySystem for"))
-    $NormalOpening = "$OSPreparingFor $SystemPronoun $SystemPronounciation game."
-    $SayThis = $NormalOpening
-    $MednafenOpening = (Get-Random -Maximum ("Using Mednafen to emulate $SystemPronoun $SystemPronounciation.", "Using Mednafen to emulate $SystemPronoun $SystemPronounciation system."))
-    If (($System -ne 'Windows') -and ($System -ne 'VR') -and ($System -ne 'Computer')) 
-    {
-      $EmulatorOpening = (Get-Random -Maximum ("Emulating $SystemPronoun $SystemPronounciation $OSSaySystem.", "Preparing to emulate $SystemPronoun $SystemPronounciation $OSSaySystem.", "Preparing Emulator for $SystemPronoun $SystemPronounciation $OSSaySystem."))
-      $SayThis = (Get-Random -Maximum ($NormalOpening, $NormalOpening, $EmulatorOpening))
-    }
-    If ($EmulatorINIEntry -like '*.dll') 
-    {
-      $RetroArchOpening = (Get-Random -Maximum ("Using RetroArch to emulate $SystemPronoun $SystemPronounciation $OSSaySystem.", "Preparing RetroArch to emulate $SystemPronoun $SystemPronounciation $OSSaySystem.", "Emulating $SystemPronoun $SystemPronounciation $OSSaySystem with RetroArch.", "Preparing to Emulate $SystemPronoun $SystemPronounciation $OSSaySystem with RetroArch."))
-      $SayThis = (Get-Random -Maximum ($NormalOpening, $NormalOpening, $EmulatorOpening, $RetroArchOpening))
-    }
-    If ($EmulatorINIEntry -eq 'mednafen') 
-    {
-      $MednafenOpening = (Get-Random -Maximum ("Using Mednafen to emulate $SystemPronoun $SystemPronounciation $OSSaySystem.", "Preparing Mednafen to emulate $SystemPronoun $SystemPronounciation $OSSaySystem.", "Emulating $SystemPronoun $SystemPronounciation $OSSaySystem with Mednafen.", "Preparing to Emulate $SystemPronoun $SystemPronounciation $OSSaySystem with Mednafen."))
-      $SayThis = (Get-Random -Maximum ($NormalOpening, $NormalOpening, $EmulatorOpening, $MednafenOpening))
-    }
-  }
-  
-  If ($About -eq 'GameEnded') 
-  {
-    $GEsaySystem = (Get-Random -Maximum ('', "$SystemPronounciation"))
-    $GEgame = 'game'
-    $GEhas = (Get-Random -Maximum ('', 'has', 'has been'))
-    $GEended = (Get-Random -Maximum ('ended', 'finished', 'closed', 'terminated', 'unloaded'))
-    If (($System -ne 'Windows') -and ($System -ne 'VR') -and ($System -ne 'Computer')) 
-    {
-      $GEgame = (Get-Random -Maximum ('game', 'emulator'))
-    }
-    If ($EmulatorINIEntry -like '*.dll')  
-    {
-      $GEgame = (Get-Random -Maximum ('game', 'emulator', 'RetroArch'))
-    }
-    If ($EmulatorINIEntry -eq 'mednafen') 
-    {
-      $GEgame = (Get-Random -Maximum ('game', 'emulator', 'Mednafen'))
-    }
-    $SayThis = (Get-Random -Maximum ("$GEsaySystem $GEgame $GEhas $GEended.", "$GameName $GEhas $GEended.", 'Game Over', "$GEsaySystem $GEgame process $GEhas $GEended." ))
-  }
-  
-  If ($About -eq 'Finished') 
-  {
-    $SayThis = (Get-Random -Maximum ('Finished.', 'Everything is finished.', 'Ending.', 'Done.'))
-  }
-  
-  
-  $speak.Speak($SayThis)
 }
 
 
@@ -764,17 +792,16 @@ function Start-Launcher
     'DS4 finished.'
   }
 
-  If ($TTSFeature -eq $true) 
+
+  If ($WasLauncherRunning -eq $true) 
   {
-    If ($WasLauncherRunning -eq $true) 
-    {
-      Say-Something -About ReturnToLauncher
-    }
-    else
-    {
-      Say-Something -About StartLauncher
-    }
+    Say-Something -About ReturnToLauncher
   }
+  else
+  {
+    Say-Something -About StartLauncher
+  }
+
   
   If (!(Get-Process -Name explorer)) 
   {
@@ -855,34 +882,32 @@ function Open-GameDocs
     ('Opening directory {0}.' -f $CurrentGameDocsDir) | timestamp >> $LogFile
     Invoke-Item -Path $CurrentGameDocsDir  
     $GamePDFs = Get-ChildItem -Path $CurrentGameDocsDir -Filter '*.pdf' | Select-Object -ExpandProperty FullName
-    If ($TTSFeature -eq $true) 
-    { 
-      If ($GamePDFs.Count -gt 1) 
-      {
-        Say-Something -About OpenGameDocs
-      }
-      If ($GamePDFs.Count -eq 1) 
-      {
-        Say-Something -About OpenOneGameDoc
-      }
+
+    If ($GamePDFs.Count -gt 1) 
+    {
+      Say-Something -About OpenGameDocs
     }
+    If ($GamePDFs.Count -eq 1) 
+    {
+      Say-Something -About OpenOneGameDoc
+    }
+
     ForEach($GamePDF in $GamePDFs) 
     {
       ('Opening {0}.' -f $GamePDF) | timestamp >> $LogFile
       Invoke-Item -Path $GamePDF
     }
     $GameURLs = Get-ChildItem -Path $CurrentGameDocsDir -Filter '*.url' | Select-Object -ExpandProperty FullName
-    If ($TTSFeature -eq $true) 
-    { 
-      If ($GameURLs.Count -gt 1) 
-      {
-        Say-Something -About OpenGameWebpage -Modifier s
-      }
-      If ($GameURLs.Count -eq 1) 
-      {
-        Say-Something -About OpenGameWebpage
-      }
+
+    If ($GameURLs.Count -gt 1) 
+    {
+      Say-Something -About OpenGameWebpage -Modifier s
     }
+    If ($GameURLs.Count -eq 1) 
+    {
+      Say-Something -About OpenGameWebpage
+    }
+
     ForEach($GameURL in $GameURLs) 
     {
       ('Opening {0}.' -f $GameURL) | timestamp >> $LogFile
@@ -890,17 +915,16 @@ function Open-GameDocs
       #Start-Sleep -Milliseconds 750
     }
     $GameToolShortcuts = Get-ChildItem -Path $CurrentGameDocsDir -Filter '*.lnk' | Select-Object -ExpandProperty FullName
-    If ($TTSFeature -eq $true) 
-    { 
-      If ($GameToolShortcuts.Count -gt 1) 
-      {
-        Say-Something -About OpenGameTool -Modifier s
-      }
-      If ($GameToolShortcuts.Count -eq 1) 
-      {
-        Say-Something -About OpenGameTool
-      }
+
+    If ($GameToolShortcuts.Count -gt 1) 
+    {
+      Say-Something -About OpenGameTool -Modifier s
     }
+    If ($GameToolShortcuts.Count -eq 1) 
+    {
+      Say-Something -About OpenGameTool
+    }
+
     ForEach($GameToolShortcut in $GameToolShortcuts) 
     {
       ('Opening {0}.' -f $GameToolShortcut) | timestamp >> $LogFile
@@ -911,10 +935,9 @@ function Open-GameDocs
     ForEach($GameUHS in $GameUHSs) 
     {
       ('Opening {0}.' -f $GameUHS) | timestamp >> $LogFile
-      If ($TTSFeature -eq $true) 
-      {
-        Say-Something -About OpenUHS
-      }
+
+      Say-Something -About OpenUHS
+
       Invoke-Item -Path $GameUHS
       #Start-Sleep -Milliseconds 500
     }
@@ -927,10 +950,9 @@ function Open-GameDocs
   If (Test-Path -Path $UnsortedGamePDF) 
   {
     ('Opening {0}.' -f $UnsortedGamePDF) | timestamp >> $LogFile
-    If ($TTSFeature -eq $true) 
-    {
-      Say-Something -About OpenOneGameDoc
-    }
+
+    Say-Something -About OpenOneGameDoc
+
     Invoke-Item -Path $UnsortedGamePDF
     #Start-Sleep -Milliseconds 500
   }
@@ -982,10 +1004,8 @@ function Start-Cheats
   {
     ForEach ($GameTrainer in $GameTrainers) 
     {
-      If ($TTSFeature -eq $true) 
-      {
-        Say-Something -About LoadTrainer
-      }
+      Say-Something -About LoadTrainer
+
       ('Opening {0}.' -f $GameTrainer) | timestamp >> $LogFile
       ('Opening {0}.' -f $GameTrainer)
       Start-Process -FilePath $GameTrainer -WorkingDirectory $TrainersDir -Verb runas
@@ -1006,10 +1026,8 @@ function Start-Cheats
   $GameFileCheatTable = $ArtMoneyTablesDir + '\Files\' + $GameName + '.' + $ArtMoneyExt
   If (Test-Path -Path $GameFileCheatTable) 
   {
-    If ($TTSFeature -eq $true) 
-    {
-      Say-Something -About LoadCheatTable -Modifier 'ArtMoney FileEditor'
-    }
+    Say-Something -About LoadCheatTable -Modifier 'ArtMoney FileEditor'
+    
     ('Loading {0} with {1}.' -f $GameFileCheatTable, $ArtMoneyName) | timestamp >> $LogFile
     $ArtMoneyArgument = '"' + $GameFileCheatTable + '"'
     Invoke-Item -Path $GameFileCheatTable
@@ -1017,10 +1035,8 @@ function Start-Cheats
   }  
   If (Test-Path -Path $ArtMoneyTable) 
   {
-    If ($TTSFeature -eq $true) 
-    {
-      Say-Something -About LoadCheatTable -Modifier ArtMoney
-    }
+    Say-Something -About LoadCheatTable -Modifier ArtMoney
+    
     ('Loading {0} with {1}.' -f $ArtMoneyTable, $ArtMoneyName) | timestamp >> $LogFile
     $ArtMoney = $ArtMoneyDir + '\' + $ArtMoneyExe
     $ArtMoneyTableDir = $ArtMoneyTablesDir + '\' + $System
@@ -1036,10 +1052,8 @@ function Start-Cheats
   $CheatEngineTable = $CheatEngineTablesDir + '\' + $GameName + '.' + $CheatEngineExt
   If (Test-Path -Path $CheatEngineTable) 
   {
-    If ($TTSFeature -eq $true) 
-    {
-      Say-Something -About LoadCheatTable -Modifier CheatEngine
-    }
+    Say-Something -About LoadCheatTable -Modifier CheatEngine
+    
     ('Loading {0} with {1}.' -f $CheatEngineTable, $CheatEngineName) | timestamp >> $LogFile
     Invoke-Item -Path $CheatEngineTable
     Start-Sleep -Seconds 1
@@ -1055,10 +1069,9 @@ function Start-Cheats
   If (Test-Path -Path $UHSFile -ErrorAction SilentlyContinue) 
   {
     ('Opening {0}.' -f $UHSFile) | timestamp >> $LogFile
-    If ($TTSFeature -eq $true) 
-    {
-      Say-Something -About OpenUHS
-    }
+
+    Say-Something -About OpenUHS
+    
     Invoke-Item -Path $UHSFile
     #Start-Sleep -Milliseconds 500
   }
@@ -1420,11 +1433,10 @@ function Ready-VR
   { 
     'Oculus Service not running. Starting it...'
     'Oculus Service not running. Starting it...' | timestamp >> $LogFile
-    If ($TTSFeature -eq $true) 
-    {
-      Say-Something -About StartOculusServices
-      Say-Something -About PleaseWait
-    }
+
+    Say-Something -About StartOculusServices
+    Say-Something -About PleaseWait
+    
     Set-Service -Name OVRLibraryService -StartupType Manual -ErrorAction SilentlyContinue
     Set-Service -Name OVRService -StartupType Manual -ErrorAction SilentlyContinue
     Start-Service -Name OVRService -ErrorAction SilentlyContinue
@@ -1434,11 +1446,10 @@ function Ready-VR
   { 
     "Oculus Client not running. Starting $OculusClient"
     "Oculus Client not running. Starting $OculusClient" | timestamp >> $LogFile
-    If ($TTSFeature -eq $true) 
-    {
-      Say-Something -About StartOculusClient
-      Say-Something -About PleaseWait
-    }
+
+    Say-Something -About StartOculusClient
+    Say-Something -About PleaseWait
+    
     Start-Service -Name OVRService -ErrorAction SilentlyContinue
     Start-Process -FilePath $OculusClient -WorkingDirectory $OculusClientDir -Verb RunAs
     Wait-ProcessToCalm -ProcessToCalm OculusClient -CalmThreshold 5
@@ -1458,12 +1469,11 @@ function Ready-VR
     { 
       'Oculus Client still not running. Starting it for the last time...'
       'Oculus Client still not running. Starting it for the last time...' | timestamp >> $LogFile
-      If ($TTSFeature -eq $true) 
-      {
-        Say-Something -About Problem
-        Say-Something -About RestartOculus
-        Say-Something -About PleaseWait
-      }
+
+      Say-Something -About Problem
+      Say-Something -About RestartOculus
+      Say-Something -About PleaseWait
+      
       Restart-Service -Name OVRService -ErrorAction SilentlyContinue
       Start-Process -FilePath $OculusClient -WorkingDirectory $OculusClientDir -Verb RunAs
     }
@@ -1476,11 +1486,9 @@ function Ready-VR
     $WaitforOculus = $WaitforOculus + 1
     If ($WaitforOculus -eq 60) 
     {
-      If ($TTSFeature -eq $true) 
-      {
-        Say-Something -About TakesLonger
-        Say-Something -About PleaseWait
-      }
+      Say-Something -About TakesLonger
+      Say-Something -About PleaseWait
+      
       Start-Service -Name OVRService -ErrorAction SilentlyContinue
       Start-Process -FilePath $OculusClient -WorkingDirectory $OculusClientDir -Verb RunAs    
     }
@@ -1657,18 +1665,16 @@ function Mount-CDROMImages
       ('Mounting {0}.' -f $ISOImage.Name)
       Mount-DiskImage -ImagePath $ISOImage.FullName
     }
-    If ($TTSFeature -eq $true) 
+
+    If ($ISOImages.Count -eq 1) 
     {
-      If ($ISOImages.Count -eq 1) 
-      {
-        Say-Something -About MountDisc
-        Start-Sleep -Seconds 1
-      }
-      If ($ISOImages.Count -gt 1) 
-      {
-        Say-Something -About MountDisc -Modifier s
-        Start-Sleep -Seconds 2
-      }
+      Say-Something -About MountDisc
+      Start-Sleep -Seconds 1
+    }
+    If ($ISOImages.Count -gt 1) 
+    {
+      Say-Something -About MountDisc -Modifier s
+      Start-Sleep -Seconds 2
     }
   }
 }
@@ -1709,10 +1715,9 @@ $GameName = ($Game -Replace ('.{0}' -f $GameExt) -split '\\')[-1]
 . Set-Audio
 
 $TTSFeature = (Get-INIValue -Path $INIFile -Section 'Audio' -Key 'TTSFeature')
-If ($TTSFeature -eq $true) 
-{
-  . Say-Something
-}
+
+
+
 
   
 IF ($Menu -eq $true) 
@@ -1740,15 +1745,16 @@ IF ($Menu -eq $true)
 IF ($TTSFeature -eq '1')
 {
   [bool]$TTSFeature = $true
+  . Say-Something
 }
 else 
 {
   [bool]$TTSFeature = $false
 }
-If ($TTSFeature -eq $true) 
-{
-  Say-Something -About Greeting
-}
+
+
+Say-Something -About Greeting
+
   
 $LauncherName = (Get-INIValue -Path $INIFile -Section 'Launcher' -Key 'Name')
 $LauncherDir = (Get-INIValue -Path $INIFile -Section 'Launcher' -Key 'Folder')
@@ -2051,11 +2057,9 @@ function Start-VR
     Wait-ProcessToCalm -ProcessToCalm OVRServer_x64 -CalmThreshold 5
   }
   If (!(Get-Process -Name OculusClient -ErrorAction SilentlyContinue)) 
-  { 
-    If ($TTSFeature -eq $true) 
-    {
-      Say-Something -About StartOculusClient
-    }
+  {
+    Say-Something -About StartOculusClient
+    
     Start-Process -FilePath $OculusClient -WorkingDirectory $OculusClientDir -Verb RunAs
     Wait-ProcessToCalm -ProcessToCalm OculusClient -CalmThreshold 5
   }
@@ -2067,10 +2071,9 @@ function Start-VR
     If ($WaitforOculus -eq 40) 
     {
       Start-Service -Name OVRService -ErrorAction SilentlyContinue
-      If ($TTSFeature -eq $true) 
-      {
-        Say-Something -About PleaseWait
-      }
+
+      Say-Something -About PleaseWait
+      
       Start-Process -FilePath $OculusClient -WorkingDirectory $OculusClientDir -Verb RunAs    
     }
   }
@@ -2097,10 +2100,9 @@ function Start-VR
     If (Test-Path -Path $steamAPI) 
     { 
       'SteamVR is needed. Starting it...'
-      If ($TTSFeature -eq $true) 
-      {
-        Say-Something -About StartSteamVR
-      }
+
+      Say-Something -About StartSteamVR
+      
       #Copy-Item -Path $steamVRDLL -Destination $steamAPI -Force
       #Start-Sleep -Seconds 3
       Start-Process -FilePath 'steam://rungameid/250820'
@@ -2114,10 +2116,8 @@ function Start-VR
       #Start-Process -FilePath $steamVR -WorkingDirectory $steamVRPath -Verb RunAs -ErrorAction SilentlyContinue
       Wait-ProcessToCalm -ProcessToCalm vrmonitor -CalmThreshold 3
       Wait-ProcessToCalm -ProcessToCalm vrdashboard -CalmThreshold 3
-      If ($TTSFeature -eq $true) 
-      {
-        Say-Something -About SteamVRLoaded
-      }
+
+      Say-Something -About SteamVRLoaded
     }
   }
   
@@ -2640,10 +2640,9 @@ If ($LauncherQuit -eq $true)
   Wait-Process -Name $LauncherProcess -Timeout 15 -ErrorAction SilentlyContinue
 }
 
-If ($TTSFeature -eq $true) 
-{
-  Say-Something -About OpeningSpeech
-}
+
+Say-Something -About OpeningSpeech
+
 
 . Close-UnneededStuff
 'Everything is closed!'
@@ -2665,10 +2664,9 @@ Set-INIValue -Path $INIFile -Section $System -Key 'Game' -Value $Game
 If ($System -eq 'VR') 
 {
   'This is a VR game. Making sure hardware is ready...'
-  If ($TTSFeature -eq $true) 
-  {
-    Say-Something -About ReadyVR
-  }
+
+  Say-Something -About ReadyVR
+  
   'This is a VR game. Making sure hardware is ready...' | timestamp >> $LogFile
   . Ready-VR
 }
@@ -2730,11 +2728,9 @@ $SWaitCounter = 0
 If ((((((Get-Counter -Counter '\Processor(_total)\% Processor Time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -ge 12) -or ((((Get-Counter -Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -ge 12)))
 {
   'High CPU or disc usage!'
-  If ($TTSFeature -eq $true) 
-  {
-    Say-Something -About Loading
-    Say-Something -About PleaseWait
-  }
+
+  Say-Something -About Loading
+  Say-Something -About PleaseWait
 }
 
 While ((((((Get-Counter -Counter '\Processor(_total)\% Processor Time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt 8) -or ((((Get-Counter -Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt 8)) -and ($SWaitCounter -lt 35))
@@ -2785,10 +2781,9 @@ If (($SystemVolume -ne $null) -and ($SystemVolume -ne ''))
   }
 }
 
-If ($TTSFeature -eq $true) 
-{
-  Say-Something -About StartGame
-}  
+
+Say-Something -About StartGame
+
 
 If (($CurrentSystemVolume -ge 0) -and ($CurrentSystemVolume -le 100)) 
 {
@@ -2842,10 +2837,9 @@ Catch
 
 . Set-Audio
 
-If ($TTSFeature -eq $true) 
-{
-  Say-Something -About GameEnded
-}
+
+Say-Something -About GameEnded
+
 
 $EndDate = Get-Date
 $IgnoreProcesses = (Get-Content -Path $IgnoreProcessesFile -ErrorAction SilentlyContinue)
@@ -2924,10 +2918,8 @@ else
   }
   New-Object  -TypeName PSObject -Property $CompleteLogHash | Export-Csv -Path $LogFileName -Delimiter "`t" -Append -Force -NoTypeInformation
   
-  If ($TTSFeature -eq $true) 
-  {
-    Say-Something -About TimePlayed
-  }
+
+  Say-Something -About TimePlayed
 }
 
 
@@ -2964,17 +2956,16 @@ If ((Get-ChildItem -Path $CurrentGameDocsDir -Recurse | Measure-Object).Count -e
 }
 
 
-If ($TTSFeature -eq $true) 
-{
-  If ($ThisTotal -like '*:*') 
-  { 
-    $TotalHours = (($ThisTotal).Split(':')[0])
-    If ([int]$TotalHours -gt '1') 
-    {
-      Say-Something -About TotalTimePlayed
-    }
+
+If ($ThisTotal -like '*:*') 
+{ 
+  $TotalHours = (($ThisTotal).Split(':')[0])
+  If ([int]$TotalHours -gt '1') 
+  {
+    Say-Something -About TotalTimePlayed
   }
 }
+
 
 If ($UseDisplayFusion -eq $true)
 {
@@ -3021,10 +3012,9 @@ else
     Start-Process -FilePath $Explorer.Path -ErrorAction SilentlyContinue
   }
   $CursorRefresh::SystemParametersInfo(0x0057,0,$null,0)
-  If ($TTSFeature -eq $true) 
-  {
-    Say-Something -About Finished
-  }
+
+  Say-Something -About Finished
+  
   Stop-Transcript -ErrorAction SilentlyContinue
   #('Everything went well, removing transcript {0}.' -f $Transcript) | timestamp > $LogFile
   #Remove-Item -Path $Transcript -Force
