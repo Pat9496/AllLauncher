@@ -1,0 +1,19 @@
+C:\Program Files (x86)\Ubisoft\Ubisoft Game Launcher
+C:\Program Files\Oculus\Support\oculus-client
+C:\Program Files\Oculus\Support\oculus-dash\dash\bin
+C:\Program Files\Oculus\Support\oculus-diagnostics
+C:\Program Files\Oculus\Support\oculus-librarian
+C:\Program Files\Oculus\Support\oculus-runtime
+C:\Program Files\Oculus\Support\oculus-worlds
+C:\Program Files\Oculus\Support\oculus-worlds\Home2\Binaries\Win64
+C:\STEAM
+C:\STEAM\bin
+C:\STEAM\bin\cef\cef.win7
+C:\STEAM\bin\cef\cef.win7x64
+C:\STEAM\steamapps\common\SteamVR\bin\vrwebhelper
+C:\STEAM\steamapps\common\SteamVR\bin\win32
+C:\STEAM\steamapps\common\SteamVR\bin\win64
+C:\Windows
+C:\Windows\System32
+H:\GalaxyClient
+H:\Origin

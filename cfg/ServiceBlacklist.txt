@@ -1,0 +1,21 @@
+DPS
+MEmuSVC
+PnkBstrA
+PnkBstrB
+PnkBstrC
+OneSyncSvc
+OneSyncSvc_9e502
+OneSyncSvc_9a01c
+OpenVPNService
+OpenVPNServiceInteractive
+OpenVPNServiceLegacy
+TeamViewer
+TrustedInstaller
+WSearch
+WdiSystemHost
+diagtrack
+schedule
+spooler
+vorpX Service
+wsappx
+wuauserv
