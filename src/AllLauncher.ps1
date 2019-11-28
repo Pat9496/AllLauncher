@@ -394,10 +394,12 @@ function Say-Something
     { 
       Add-Type -AssemblyName System.Speech
       $speak = New-Object -TypeName System.Speech.Synthesis.SpeechSynthesizer
-      If ($speak.GetInstalledVoices().VoiceInfo.Name -notcontains 'Microsoft Eva') 
+      If (($speak.GetInstalledVoices().VoiceInfo.Name -notcontains 'Microsoft Eva') -and ($speak.GetInstalledVoices().VoiceInfo.Name -notcontains 'Microsoft Eva Mobile'))
       {
         #Invoke-Item -Path "$CurrentDir\src\Microsoft-Eva-Mobile.reg"
         #Wait-Process -Name regedit
+        $speak.Speak('Installing Eva voice.')
+        
         $RegKeys = 'Microsoft\Speech', 'Microsoft\Speech_OneCore', 'WOW6432Node\Microsoft\SPEECH'
 
         ForEach ($RegKey in $RegKeys) 
@@ -424,9 +426,13 @@ function Say-Something
         }
   
         #$speak.SelectVoice('Microsoft Eva')
-        $speak.Speak('Voice installation complete. New voice will be used next time you reboot your system.')
+        $speak.Speak('Eva voice installation complete. New voice will be used next time you reboot your system.')
       }
-      If ($speak.GetInstalledVoices().VoiceInfo.Name -contains 'Microsoft Eva') 
+      If ($speak.GetInstalledVoices().VoiceInfo.Name -contains 'Microsoft Eva Mobile')
+      {
+        $speak.SelectVoice('Microsoft Eva Mobile')
+      }
+      If ($speak.GetInstalledVoices().VoiceInfo.Name -contains 'Microsoft Eva')
       {
         $speak.SelectVoice('Microsoft Eva')
       }
@@ -1888,6 +1894,9 @@ $MIDISynthEXE = (Get-INIValue -Path $INIFile -Section 'Audio' -Key 'MIDISynthEXE
 $GameTrainers = Get-ChildItem -Path $TrainersDir -Filter '*.exe' | Where-Object -FilterScript {
   $_.Name -like "$GameName Trainer*"
 }
+$IgnoreProcesses = (Get-Content -Path $IgnoreProcessesFile -ErrorAction SilentlyContinue)
+$IgnoreDirectories = (Get-Content -Path $IgnoreDirectoriesFile -ErrorAction SilentlyContinue)
+$IgnoreDirectoriesEXEs = (Get-ChildItem -Path $IgnoreDirectories -Filter '*.exe').FullName
 
 $CurrentGameDocsDir = $GameDocsDir + '\' + $GameName
 $LogFileSystemDir = $LogFileDir + '\' + $System
@@ -1915,7 +1924,7 @@ function Start-Windows
   $SpecialSystem = 1
   $IgnoreProcesses = (Get-Content -Path $IgnoreProcessesFile -ErrorAction SilentlyContinue)
   $IgnoreDirectories = (Get-Content -Path $IgnoreDirectoriesFile -ErrorAction SilentlyContinue)
-  $IgnoreDirectoriesEXEs = (Get-ChildItem -Path $IgnoreDirectories -Filter '*.exe').FullName
+  $IgnoreDirectoriesEXEs = (Get-ChildItem -Path $IgnoreDirectories -Filter '*.exe').FullName | Get-Unique
   
   IF ($Game -like '*.lnk') 
   {
@@ -1947,32 +1956,26 @@ function Start-Windows
   "Invoking $Game"
   Invoke-Item -Path $Game
 
-  Start-Sleep -Seconds 1
-  $AfterGameProcesses = (Get-Process -ErrorAction SilentlyContinue |
-    Where-Object -Property ProcessName -NotIn -Value $IgnoreProcesses |
-    Where-Object -Property Path -NotIn -Value $IgnoreDirectoriesEXEs |
-  Where-Object -Property ProcessName -NotLike -Value '*.tmp').ProcessName | Get-Unique
-  $NewProcesses = (Compare-Object -ReferenceObject $BeforeGameProcesses -DifferenceObject $AfterGameProcesses -ErrorAction SilentlyContinue | Where-Object -Property SideIndicator -EQ -Value '=>').InputObject
-  
   While ($NewProcesses.Count -lt 1) 
-  { 
+  {
     Start-Sleep -Seconds 1
     $AfterGameProcesses = (Get-Process -ErrorAction SilentlyContinue |
+      Select-Object -Property ProcessName, Path |
       Where-Object -Property ProcessName -NotIn -Value $IgnoreProcesses |
       Where-Object -Property Path -NotIn -Value $IgnoreDirectoriesEXEs |
     Where-Object -Property ProcessName -NotLike -Value '*.tmp').ProcessName | Get-Unique
     $NewProcesses = (Compare-Object -ReferenceObject $BeforeGameProcesses -DifferenceObject $AfterGameProcesses -ErrorAction SilentlyContinue | Where-Object -Property SideIndicator -EQ -Value '=>').InputObject
   }
   $RunningGameProcess = $NewProcesses
-  "Process found: $RunningGameProcess"
+  "Processes found: $NewProcesses"
   
   If ($NewProcesses -like '*launch*') 
   {
     'Found something that looks like a launcher.'
     $RunningGameLauncher = $NewProcesses
-    While ($NewProcesses.Count -lt 2) 
-    { 
-      Start-Sleep -Seconds 2
+    While (($NewProcesses -like '*launch*') -and ($NewProcesses.Count -lt 2)) 
+    {
+      Start-Sleep -Seconds 1
       $AfterGameProcesses = (Get-Process -ErrorAction SilentlyContinue |
         Where-Object -Property ProcessName -NotIn -Value $IgnoreProcesses |
         Where-Object -Property Path -NotIn -Value $IgnoreDirectoriesEXEs |
@@ -1980,10 +1983,17 @@ function Start-Windows
       $NewProcesses = (Compare-Object -ReferenceObject $BeforeGameProcesses -DifferenceObject $AfterGameProcesses -ErrorAction SilentlyContinue | Where-Object -Property SideIndicator -EQ -Value '=>').InputObject
     }
     $RunningGameProcess = $NewProcesses[1]
-    ('Additional Process found: {0}' -f $RunningGameProcess)
+    ('Additional Process found: {0}' -f $NewProcesses)
   }
   
-  Start-Sleep -Seconds 3
+  Start-Sleep -Seconds 5
+  $AfterGameProcesses = (Get-Process -ErrorAction SilentlyContinue |
+    Where-Object -Property ProcessName -NotIn -Value $IgnoreProcesses |
+    Where-Object -Property Path -NotIn -Value $IgnoreDirectoriesEXEs |
+  Where-Object -Property ProcessName -NotLike -Value '*.tmp').ProcessName | Get-Unique
+  $NewProcesses = (Compare-Object -ReferenceObject $BeforeGameProcesses -DifferenceObject $AfterGameProcesses -ErrorAction SilentlyContinue | Where-Object -Property SideIndicator -EQ -Value '=>').InputObject
+  ('Number of all new unignored processes: {0}' -f $NewProcesses.Count)
+  ('Names of all new unignored processes: {0}' -f [string]($NewProcesses.ProcessName))
   
   If (Get-Process -Name "$RunningGameProcess" -ErrorAction SilentlyContinue) 
   { 
@@ -2002,7 +2012,33 @@ function Start-Windows
   Start-Sleep -Seconds 5
   ('Waiting for:  {0}' -f $RunningGameProcess)
   Get-Process -Name $RunningGameProcess -ErrorAction SilentlyContinue | Wait-Process
-  Start-Sleep -Seconds 5
+  Start-Sleep -Seconds 1
+  If (Get-Process -Name "$RunningGameProcess" -ErrorAction SilentlyContinue) 
+  { 
+    ('Setting {0} to high.' -f $RunningGameProcess)
+    Try 
+    {
+      (Get-Process -Name "$RunningGameProcess" -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
+    }
+    Catch 
+    {
+      'Cannot set Priority.'
+    }
+  }  
+  Get-Process -Name $RunningGameProcess -ErrorAction SilentlyContinue | Wait-Process
+  Start-Sleep -Seconds 1
+  If (Get-Process -Name "$RunningGameProcess" -ErrorAction SilentlyContinue) 
+  { 
+    ('Setting {0} to high.' -f $RunningGameProcess)
+    Try 
+    {
+      (Get-Process -Name "$RunningGameProcess" -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
+    }
+    Catch 
+    {
+      'Cannot set Priority.'
+    }
+  }  
   Get-Process -Name $RunningGameProcess -ErrorAction SilentlyContinue | Wait-Process
   'Game has ended.'  
   'Game has ended.' | timestamp >> $LogFile
