@@ -17,3 +17,7 @@ C:\Windows
 C:\Windows\System32
 H:\GalaxyClient
 H:\Origin
+C:\WINDOWS\system32\wbem
+C:\WINDOWS\SystemApps
+C:\WINDOWS\Microsoft.NET
+C:\Program Files\NVIDIA Corporation

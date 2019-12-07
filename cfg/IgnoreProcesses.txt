@@ -1,5 +1,8 @@
 ActivationUI
 ApplicationFrameHost
+autoupdate
+autoupdater
+chrome
 CrashReporter
 CrashReportClient
 DisplayFusion
@@ -11,6 +14,10 @@ DXSetup
 EALink
 EDLaunch
 FileCoAuth
+firefox
+Google
+GoogleUpdate
+GoogleUpdater
 GOG Galaxy Notifications Renderer
 GalaxyClient
 GalaxyClient Helper
@@ -22,11 +29,16 @@ GamingServicesNet
 GameOverlayUI
 HardwareReporter
 Home2-Win64-Shipping
+iexplore
+install
+installer
 igoproxy
 MachineIdentifier
 MEMUConsole
 MEGAupdater
 Memory Compression
+MpCmdRun
+notification_helper
 NVDisplay
 NVDisplay.Container
 NvTelemetryContainer
@@ -38,6 +50,11 @@ oculus-platform-runtime
 OculusClient
 OculusDash
 OpenVR-InputEmulatorOverlay
+opera
+opera_autoupdate
+opera_autoupdater
+opera_gx_splash
+opera_crashreporter
 Origin
 OriginClientService
 OriginThinSetup
@@ -51,6 +68,7 @@ SearchUI
 SearchProtocolHost
 SecurityHealthcare
 SecurityHealthService
+setup
 SgrmBroker
 Steam
 SteamService
@@ -94,6 +112,7 @@ svchost
 taskhostw
 taskmgr
 upc
+update
 updater
 vcredist.x64
 vcredist.x86
@@ -114,3 +133,16 @@ winlogon
 WinStore
 WinStore.App
 ~Mnn133.tmp
+ITBMSvc
+LaunchBox
+MsMpEng
+NisSrv
+openvpnserv
+openvpnserv2
+Registry
+RemindersServer
+services
+StartMenuExperienceHost
+TabTip
+uTorrent
+WindowsInternal.ComposableShell.Experiences.TextInput.InputApp
