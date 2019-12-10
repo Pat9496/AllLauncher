@@ -146,3 +146,5 @@ StartMenuExperienceHost
 TabTip
 uTorrent
 WindowsInternal.ComposableShell.Experiences.TextInput.InputApp
+IndianaWindowsStore-Win64-Shipping
+Store-Win64-Shipping
