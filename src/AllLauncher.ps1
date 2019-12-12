@@ -1,4 +1,4 @@
-param
+﻿param
 (
   [Parameter(Position = 0)]
   [string]
@@ -588,8 +588,28 @@ function Say-Something
         {
           $DatesTH = 'th'
         }
+        
+        If ((Get-Date -Format ddMM) -eq 2412) 
+        {
+          $SpecialGreeting = "Merry Christmas $Callsign."
+          $Today = "$Today christmas eve"
+        }
+        If ((Get-Date -Format ddMM) -eq 2512) 
+        {
+          $SpecialGreeting = "Merry Christmas $Callsign."
+          $Today = "$Today christmas day"
+        }
+        If ((Get-Date -Format ddMM) -eq 3112) 
+        {
+          $Today = "$Today new year's eve"
+        }
+        If ((Get-Date -Format ddMM) -eq 0101) 
+        {
+          $SpecialGreeting = "Happy new year $Callsign."
+          $Today = "$Today new year's day"
+        }
             
-        $SayThis = ("$Greeting $Callsign. - $Today $TodaysDay, the $TodaysDate$DatesTH of $MonthAndYear.")
+        $SayThis = ("$Greeting $Callsign. - $Today $TodaysDay, the $TodaysDate$DatesTH of $MonthAndYear. $SpecialGreeting")
       }
       else
       {
@@ -1827,6 +1847,10 @@ function Detect-GameProcess
         ('Additional Process found: {0}' -f $NewProcess)
       }
     }
+    If ($NewProcess.Count -gt 1)
+    {
+      $NewProcess = $NewProcess[0]
+    }
   }
 }
 
@@ -2105,16 +2129,16 @@ function Start-Windows
 
   . Detect-GameProcess
   
-
+  Start-Sleep -Seconds 5
   [int]$WaitingForGameProcess = 0
   While ($WaitingForGameProcess -lt 5)
   { 
     If (Get-Process -Name $NewProcess -ErrorAction SilentlyContinue) 
     { 
-      Start-Sleep -Seconds 10
       ('Setting {0} to high.' -f $NewProcess)
       Try 
       {
+        Start-Sleep -Seconds 5
         (Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
       }
       Catch 
@@ -2126,10 +2150,11 @@ function Start-Windows
     ('Waiting for:  {0}' -f $NewProcess)
     If (Get-Process -Name $NewProcess -ErrorAction SilentlyContinue) 
     {
+      Start-Sleep -Seconds 2
       Focus-Process -ProcessName $NewProcess -ErrorAction SilentlyContinue
     }
     Get-Process -Name $NewProcess -ErrorAction SilentlyContinue | Wait-Process
-    Start-Sleep -Seconds 2
+    $WaitingForGameProcess = $WaitingForGameProcess + 1
   }
 
   'Game has ended.'  
