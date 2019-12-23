@@ -103,8 +103,13 @@ public static extern bool SystemParametersInfo(
                  uint fWinIni);
 '@
 $CursorRefresh = Add-Type -MemberDefinition $CSharpSig -Name WinAPICall -Namespace SystemParamInfo -PassThru -ErrorAction SilentlyContinue
-
 $CursorRefresh::SystemParametersInfo(0x0057,0,$null,0)
+Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+$Displays = [System.Windows.Forms.Screen]::AllScreens
+$PrimaryMonitor = $Displays[0].Bounds
+$SecondaryMonitor = $Displays[1].Bounds
+$PrimaryScreen = $Displays[0].WorkingArea
+$SecondaryScreen = $Displays[1].WorkingArea
 
 function Hide-DesktopIcons 
 {
@@ -281,6 +286,311 @@ function Get-Shortcut
     }
   }
 }
+Function Get-WindowSizeAndPos 
+{
+  [OutputType('System.Automation.WindowInfo')]
+  [cmdletbinding()]
+  Param (
+    [parameter(ValueFromPipelineByPropertyName = $true)]
+    $ProcessName,
+    [parameter(ValueFromPipelineByPropertyName = $true)]
+    $MainWindowHandle
+  )
+  Begin {
+    Try
+    {
+      [void][Window]
+    }
+    Catch 
+    {
+      Add-Type -TypeDefinition @"
+              using System;
+              using System.Runtime.InteropServices;
+              public class Window {
+                [DllImport("user32.dll")]
+                [return: MarshalAs(UnmanagedType.Bool)]
+                public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+              }
+              public struct RECT
+              {
+                public int Left;        // x position of upper-left corner
+                public int Top;         // y position of upper-left corner
+                public int Right;       // x position of lower-right corner
+                public int Bottom;      // y position of lower-right corner
+              }
+"@
+    }
+  }
+  Process {        
+    If (($MainWindowHandle -eq $null) -or ($MainWindowHandle -eq '') -or ($MainWindowHandle -eq 0)) 
+    {
+      $Handles = (Get-Process -Name $ProcessName -ErrorAction SilentlyContinue ).MainWindowHandle
+    }
+    else 
+    {
+      $Handles = $MainWindowHandle
+    }          
+    ForEach ($Handle in $Handles) 
+    {
+      #$Handle = $_.MainWindowHandle
+      $Rectangle = New-Object -TypeName RECT
+      $Return = [Window]::GetWindowRect($Handle,[ref]$Rectangle)
+      If ($Return) 
+      {
+        $Height = $Rectangle.Bottom - $Rectangle.Top
+        $Width = $Rectangle.Right - $Rectangle.Left
+        $Size = New-Object -TypeName System.Management.Automation.Host.Size -ArgumentList $Width, $Height
+        $TopLeft = New-Object -TypeName System.Management.Automation.Host.Coordinates -ArgumentList $Rectangle.Left, $Rectangle.Top
+        $BottomRight = New-Object -TypeName System.Management.Automation.Host.Coordinates -ArgumentList $Rectangle.Right, $Rectangle.Bottom
+        $Object = [pscustomobject]@{
+          ProcessName = $ProcessName
+          Handle      = $Handle
+          Size        = $Size
+          TopLeft     = $TopLeft
+          BottomRight = $BottomRight
+        }
+        $Object.PSTypeNames.insert(0,'System.Automation.WindowInfo')
+        $Object
+      }
+    }
+  }
+}
+Function Move-Window 
+{
+  [OutputType('System.Automation.WindowInfo')]
+  [cmdletbinding()]
+  Param (
+    [parameter(ValueFromPipelineByPropertyName = $true)]
+    $ProcessName,
+    [int]$X,
+    [int]$Y,
+    [int]$Width,
+    [int]$Height,
+    $MainWindowHandle,
+    [int]$Screen,
+    [switch]$center,
+    [switch]$Passthru
+  )
+  Try
+  {
+    [void][Window]
+  }
+  Catch 
+  {
+    Add-Type -TypeDefinition @"
+              using System;
+              using System.Runtime.InteropServices;
+              public class Window {
+                [DllImport("user32.dll")]
+                [return: MarshalAs(UnmanagedType.Bool)]
+                public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+                [DllImport("User32.dll")]
+                public extern static bool MoveWindow(IntPtr handle, int x, int y, int width, int height, bool redraw);
+              }
+              public struct RECT
+              {
+                public int Left;
+                public int Top;
+                public int Right;
+                public int Bottom;
+              }
+"@
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+  }
+  
+  $Displays = [System.Windows.Forms.Screen]::AllScreens
+  $PrimaryMonitor = $Displays[0].Bounds
+  $SecondaryMonitor = $Displays[1].Bounds
+  $PrimaryScreen = $Displays[0].WorkingArea
+  $SecondaryScreen = $Displays[1].WorkingArea
+  
+  $Rectangle = New-Object -TypeName RECT
+  $Handles = (Get-Process -Name $ProcessName -ErrorAction SilentlyContinue).MainWindowHandle
+  ForEach ($Handle in $Handles) 
+  { 
+    #$WindowSizeandPos = Get-WindowSizeAndPos -MainWindowHandle $Handle
+    $Rectangle = New-Object -TypeName RECT
+    #[Window]::GetWindowRect($Handle,[ref]$Rectangle)
+    $Return = [Window]::GetWindowRect($Handle,[ref]$Rectangle)
+    If (($Rectangle.Left -ge $PrimaryMonitor.Left) -and ($Rectangle.Right -le $PrimaryMonitor.Right))
+    {
+      $UsePrimaryDisplay = $true
+      $IsOnPrimaryDisplay = $true
+    } 
+    else
+    {
+      $UsePrimaryDisplay = $false
+      $IsOnPrimaryDisplay = $false
+    } 
+    If ($Screen -eq 1) 
+    {
+      $UsePrimaryDisplay = $true
+    } 
+    If ($Screen -eq 2) 
+    {
+      $UsePrimaryDisplay = $false
+    } 
+
+    If ($IsOnPrimaryDisplay -eq $true)
+    {
+      [int]$XPosPercent = (100/$PrimaryScreen.Size.Width)*$Rectangle.Left
+      [int]$YPosPercent = (100/$PrimaryScreen.Size.Height)*$Rectangle.Top
+    }
+    else
+    {
+      [int]$XPosPercent = (100/$SecondaryScreen.Size.Width)*$Rectangle.Left
+      [int]$YPosPercent = (100/$SecondaryScreen.Size.Height)*$Rectangle.Top
+    }
+    If ([int]$XPosPercent -lt 0) 
+    {
+      [int]$XPosPercent = 100 + [int]$XPosPercent
+    }
+    If ([int]$YPosPercent -lt 0) 
+    {
+      [int]$YPosPercent = 100 + [int]$YPosPercent
+    }
+    If ($center -eq $true)
+    {
+      If ($UsePrimaryDisplay -eq $true)
+      { 
+        [int]$NewPosX = ($PrimaryScreen.Left + (($PrimaryScreen.Size.Width - ($Rectangle.Right - $Rectangle.Left))/2))
+        [int]$NewPosY = ($PrimaryScreen.Top + (($PrimaryScreen.Size.Height - ($Rectangle.Bottom - $Rectangle.Top))/2))
+      }
+      else
+      { 
+        [int]$NewPosX = ($Rectangle.Left + (($SecondaryScreen.Size.Width - ($Rectangle.Right - $Rectangle.Left))/2))
+        [int]$NewPosY = ($SecondaryScreen.Top + (($SecondaryScreen.Size.Height - ($Rectangle.Bottom - $Rectangle.Top))/2))
+      }
+    }
+    else
+    {
+      If ($UsePrimaryDisplay -eq $true)
+      { 
+        [int]$NewPosX = ($PrimaryScreen.Left + (($PrimaryScreen.Size.Width/100)*$XPosPercent))
+        [int]$NewPosY = ($PrimaryScreen.Top + (($PrimaryScreen.Size.Height/100)*$YPosPercent))
+      }
+   
+      else
+      { 
+        [int]$NewPosX = ($SecondaryScreen.Left + (($SecondaryScreen.Size.Width/100)*$XPosPercent))
+        [int]$NewPosY = ($SecondaryScreen.Top + (($SecondaryScreen.Size.Height/100)*$XPosPercent))
+      }
+    }
+    
+      
+    If (-NOT $PSBoundParameters.ContainsKey('Width')) 
+    {
+      [int]$Width = $Rectangle.Right - $Rectangle.Left
+    }
+    If (-NOT $PSBoundParameters.ContainsKey('Height')) 
+    {
+      [int]$Height = $Rectangle.Bottom - $Rectangle.Top
+    }
+    If (-NOT $PSBoundParameters.ContainsKey('X')) 
+    {
+      [int]$X = $NewPosX
+    }
+    If (-NOT $PSBoundParameters.ContainsKey('Y')) 
+    {
+      [int]$Y = $NewPosY
+    }
+    If ($Return) 
+    {
+      $Return = [Window]::MoveWindow($Handle, $X, $Y, $Width, $Height,$true)
+    }
+    If ($PSBoundParameters.ContainsKey('Passthru')) 
+    {
+      $Rectangle = New-Object -TypeName RECT
+      $Return = [Window]::GetWindowRect($Handle,[ref]$Rectangle)
+      If ($Return) 
+      {
+        $Height = $Rectangle.Bottom - $Rectangle.Top
+        $Width = $Rectangle.Right - $Rectangle.Left
+        $Size = New-Object -TypeName System.Management.Automation.Host.Size -ArgumentList $Width, $Height
+        $TopLeft = New-Object -TypeName System.Management.Automation.Host.Coordinates -ArgumentList $Rectangle.Left, $Rectangle.Top
+        $BottomRight = New-Object -TypeName System.Management.Automation.Host.Coordinates -ArgumentList $Rectangle.Right, $Rectangle.Bottom
+        $Object = [pscustomobject]@{
+          ProcessName = $ProcessName
+          Handle      = $Handle
+          Size        = $Size
+          TopLeft     = $TopLeft
+          BottomRight = $BottomRight
+        }
+        $Object.PSTypeNames.insert(0,'System.Automation.WindowInfo')
+        $Object            
+      }
+    }
+  }
+}
+function Set-WindowStyle 
+{
+  param(
+    [Parameter()]
+    [ValidateSet('FORCEMINIMIZE', 'HIDE', 'MAXIMIZE', 'MINIMIZE', 'RESTORE', 
+        'SHOW', 'SHOWDEFAULT', 'SHOWMAXIMIZED', 'SHOWMINIMIZED', 
+    'SHOWMINNOACTIVE', 'SHOWNA', 'SHOWNOACTIVATE', 'SHOWNORMAL')]
+    $Style = 'SHOW',
+    [Parameter(ValueFromPipelineByPropertyName = $true)]
+    $ProcessName
+    #$MainWindowHandle = (Get-Process -Id $pid).MainWindowHandle
+  )
+  $WindowStates = @{
+    FORCEMINIMIZE   = 11
+    HIDE            = 0
+    MAXIMIZE        = 3
+    MINIMIZE        = 6
+    RESTORE         = 9
+    SHOW            = 5
+    SHOWDEFAULT     = 10
+    SHOWMAXIMIZED   = 3
+    SHOWMINIMIZED   = 2
+    SHOWMINNOACTIVE = 7
+    SHOWNA          = 8
+    SHOWNOACTIVATE  = 4
+    SHOWNORMAL      = 1
+  }
+  Write-Verbose -Message ('Set Window Style {1} on handle {0}' -f $MainWindowHandle, $($WindowStates[$Style]))
+
+  $MainWindowHandles = (Get-Process -Name $ProcessName -ErrorAction SilentlyContinue).MainWindowHandle
+  ForEach ($MainWindowHandle in $MainWindowHandles)
+  {
+    $Win32ShowWindowAsync = Add-Type -MemberDefinition @" 
+    [DllImport("user32.dll")] 
+    public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+"@ -Name 'Win32ShowWindowAsync' -Namespace Win32Functions -PassThru
+
+    $null = $Win32ShowWindowAsync::ShowWindowAsync($MainWindowHandle, $WindowStates[$Style])
+  }
+}
+function Wait-WindowAppear
+{
+  Param (
+    [parameter(ValueFromPipelineByPropertyName = $true)]
+  $ProcessName)
+  
+  If (($ProcessName -eq $null) -or ($ProcessName -eq '')) 
+  {
+    $ProcessName = 'zzzzzzzzzzzz'
+  }
+  [int]$WaitTime = 0
+  [bool]$WaitingFinished = $false
+  If ((Get-Process -Name $ProcessName -ErrorAction SilentlyContinue).Count -gt 1) 
+  {
+    "More than one process with the name $ProcessName."
+  }
+  else
+  {
+    While ((Get-Process -Name $ProcessName -ErrorAction SilentlyContinue) -and ($WaitingFinished -eq $false))
+    { 
+      While (([int](Get-Process -Name $ProcessName -ErrorAction SilentlyContinue).MainWindowHandle -eq 0) -and ($WaitTime -lt 300))
+      {
+        Start-Sleep -Milliseconds 50
+        $WaitTime = $WaitTime + 1
+      }
+      $WaitingFinished = $true
+    }
+  }
+}
 function Wait-ProcessToCalm
 {
   param
@@ -293,7 +603,7 @@ function Wait-ProcessToCalm
     $CalmThreshold
   )
 
-  If ($ProcessToCalm -eq '') 
+  If (($ProcessToCalm -eq '') -or ($ProcessToCalm -eq $null))
   {
     'No process to wait for until it is calm.'
   }
@@ -303,33 +613,30 @@ function Wait-ProcessToCalm
     {
       $CalmThreshold = 10
     } 
-    $WaitTime = 20
+    $WaitTime = 100
     
     If ($ProcessToCalm.GetType().Name -eq 'Process') 
     {
       $ProcessToCalm = $ProcessToCalm.Name
     }
     
-    $WaitCounter = 0
+    [int]$WaitCounter = 0
     
     If (!(Get-Process -Name $ProcessToCalm -ErrorAction SilentlyContinue)) 
     { 
       "Waiting for process $ProcessToCalm to appear..."
       While ((!(Get-Process -Name $ProcessToCalm -ErrorAction SilentlyContinue)) -and ($WaitCounter -lt $WaitTime)) 
       { 
-        Start-Sleep -Milliseconds 250
+        Start-Sleep -Milliseconds 100
         $WaitCounter = $WaitCounter + 1
       }
     }
 
     If (Get-Process -Name $ProcessToCalm -ErrorAction SilentlyContinue) 
     { 
-      #$ProcessToCalm = Get-Process -Name $ProcessToCalm -ErrorAction SilentlyContinue
-
-      Start-Sleep -Milliseconds 250
       ('Waiting for process {0} to calm down before continuing...' -f $ProcessToCalm)
     
-      $WaitCounter = 0
+      [int]$WaitCounter = 0
       Write-Host -Object ('Waiting for the process to calm down to {0}...' -f $CalmThreshold) -NoNewline
     
       While ((((((Get-Counter -Counter ('\Process({0})\% Processor Time' -f $ProcessToCalm) -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt $CalmThreshold) -or ((((Get-Counter -Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt $CalmThreshold)) -AND ($WaitCounter -lt $WaitTime))
@@ -382,7 +689,7 @@ function Request-Close
 function Focus-Process 
 {
   param(
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory,ValueFromPipelineByPropertyName = $true)]
     [string] $ProcessName
   )
 
@@ -399,7 +706,7 @@ function Focus-Process
 
   if (-not $hWnd) 
   {
-    Throw "No $ProcessName process with a non-empty window title found."
+    "Unable to focus on $ProcessName. No process with a non-empty window title found."
   }
 
   $type = Add-Type -PassThru -Namespace Util -Name SetFgWin -MemberDefinition @'
@@ -442,8 +749,6 @@ function Say-Something
       $speak = New-Object -TypeName System.Speech.Synthesis.SpeechSynthesizer
       If (($speak.GetInstalledVoices().VoiceInfo.Name -notcontains 'Microsoft Eva') -and ($speak.GetInstalledVoices().VoiceInfo.Name -notcontains 'Microsoft Eva Mobile'))
       {
-        #Invoke-Item -Path "$CurrentDir\src\Microsoft-Eva-Mobile.reg"
-        #Wait-Process -Name regedit
         $speak.Speak('Installing Eva voice.')
         
         $RegKeys = 'Microsoft\Speech', 'Microsoft\Speech_OneCore', 'WOW6432Node\Microsoft\SPEECH'
@@ -614,7 +919,7 @@ function Say-Something
       else
       {
         $speak.Rate = -1
-        $speak.Speak(((Get-Random -Maximum ('Starting', 'Initiating', ' ', 'Readying', 'Loading', 'Preparing', 'Launching', 'Opening'))))
+        $speak.Speak(((Get-Random -Maximum ('Starting', 'Initiating', ' ', 'Readying', 'Loading', 'Preparing', 'Launching', 'Commencing', 'Opening'))))
         $speak.Rate = -2
         $speak.Speak("$GameName")
         $speak.Rate = 0
@@ -821,7 +1126,7 @@ function Say-Something
       {
         $GEgame = (Get-Random -Maximum ('game', 'emulator', 'Mednafen'))
       }
-      $SayThis = (Get-Random -Maximum ("$GEsaySystem $GEgame $GEhas $GEended.", "$GameName $GEhas $GEended.", 'Game Over', "$GEsaySystem $GEgame process $GEhas $GEended." ))
+      $SayThis = (Get-Random -Maximum ("$GEsaySystem $GEgame $GEhas $GEended.", "$GameName $GEhas $GEended.", 'Game, Over.', "$GEsaySystem $GEgame $GEhas $GEended.", "$GameName $GEhas $GEended.", 'Game Over', "$GEsaySystem $GEgame process $GEhas $GEended." ))
     }
   
     If ($About -eq 'Finished') 
@@ -885,13 +1190,16 @@ function Start-Launcher
   }
     
   $CursorRefresh::SystemParametersInfo(0x0057,0,$null,0)
-  
+  Start-WhitelistedServices
   
   'Starting Launcher'
   'Starting Launcher...' | timestamp >> $LogFile
-  Start-Process -FilePath $Launcher -WorkingDirectory $LauncherDir -Verb RunAs
-  
-  Start-WhitelistedServices
+  Start-Process -FilePath $Launcher -WorkingDirectory $LauncherDir -Verb RunAs -WindowStyle Maximized
+  Wait-WindowAppear -ProcessName $LauncherProcess
+  Focus-Process -ProcessName $LauncherProcess -ErrorAction SilentlyContinue
+  Move-Window -ProcessName $LauncherProcess -X $PrimaryScreen.Top -Y $PrimaryScreen.Left -Width $PrimaryScreen.Right -Height $PrimaryScreen.Bottom -Screen 1
+  Set-WindowStyle -ProcessName $LauncherProcess -Style MAXIMIZE -ErrorAction SilentlyContinue
+    
   If ($UseDisplayFusion -eq $true)
   {
     'Preparing display for your launcher...' | timestamp >> $LogFile
@@ -907,8 +1215,11 @@ function Start-Launcher
     }
   }
   
-  Wait-ProcessToCalm -ProcessToCalm $LauncherProcess -CalmThreshold 25
+  Wait-ProcessToCalm -ProcessToCalm $LauncherProcess -CalmThreshold 60
+  Move-Window -ProcessName $LauncherProcess -X $PrimaryScreen.Top -Y $PrimaryScreen.Left -Width $PrimaryScreen.Right -Height $PrimaryScreen.Bottom -Screen 1
+  Set-WindowStyle -ProcessName $LauncherProcess -Style MAXIMIZE -ErrorAction SilentlyContinue
   Focus-Process -ProcessName $LauncherProcess -ErrorAction SilentlyContinue
+    
   Say-Something -About Ready
   
   'Finished!' | timestamp >> $LogFile
@@ -960,7 +1271,7 @@ function Open-GameDocs
   If (Test-Path -Path $CurrentGameDocsDir) 
   {
     ('Opening directory {0}.' -f $CurrentGameDocsDir) | timestamp >> $LogFile
-    Invoke-Item -Path $CurrentGameDocsDir  
+    Invoke-Item -Path $CurrentGameDocsDir -ErrorAction SilentlyContinue
     $GamePDFs = Get-ChildItem -Path $CurrentGameDocsDir -Filter '*.pdf' | Select-Object -ExpandProperty FullName
 
     If ($GamePDFs.Count -gt 1) 
@@ -975,7 +1286,7 @@ function Open-GameDocs
     ForEach($GamePDF in $GamePDFs) 
     {
       ('Opening {0}.' -f $GamePDF) | timestamp >> $LogFile
-      Invoke-Item -Path $GamePDF
+      Invoke-Item -Path $GamePDF -ErrorAction SilentlyContinue
     }
     $GameURLs = Get-ChildItem -Path $CurrentGameDocsDir -Filter '*.url' | Select-Object -ExpandProperty FullName
 
@@ -991,7 +1302,7 @@ function Open-GameDocs
     ForEach($GameURL in $GameURLs) 
     {
       ('Opening {0}.' -f $GameURL) | timestamp >> $LogFile
-      Invoke-Item -Path $GameURL
+      Invoke-Item -Path $GameURL -ErrorAction SilentlyContinue
       #Start-Sleep -Milliseconds 750
     }
     $GameToolShortcuts = Get-ChildItem -Path $CurrentGameDocsDir -Filter '*.lnk' | Select-Object -ExpandProperty FullName
@@ -1008,7 +1319,7 @@ function Open-GameDocs
     ForEach($GameToolShortcut in $GameToolShortcuts) 
     {
       ('Opening {0}.' -f $GameToolShortcut) | timestamp >> $LogFile
-      Invoke-Item -Path $GameToolShortcut
+      Invoke-Item -Path $GameToolShortcut -ErrorAction SilentlyContinue
       #Start-Sleep -Seconds 3
     }
     $GameUHSs = Get-ChildItem -Path $CurrentGameDocsDir -Filter '*.uhs' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
@@ -1018,7 +1329,7 @@ function Open-GameDocs
 
       Say-Something -About OpenUHS
 
-      Invoke-Item -Path $GameUHS
+      Invoke-Item -Path $GameUHS -ErrorAction SilentlyContinue
       #Start-Sleep -Milliseconds 500
     }
   }
@@ -1033,7 +1344,7 @@ function Open-GameDocs
 
     Say-Something -About OpenOneGameDoc
 
-    Invoke-Item -Path $UnsortedGamePDF
+    Invoke-Item -Path $UnsortedGamePDF -ErrorAction SilentlyContinue
     #Start-Sleep -Milliseconds 500
   }
   If (Get-Process -Name '*pdf*', '*reader*', '*foxit*', '*acro*', '*tmp', '*uhs*', '*spot*', '*fire*' -ErrorAction SilentlyContinue)
@@ -1110,7 +1421,7 @@ function Start-Cheats
     
     ('Loading {0} with {1}.' -f $GameFileCheatTable, $ArtMoneyName) | timestamp >> $LogFile
     $ArtMoneyArgument = '"' + $GameFileCheatTable + '"'
-    Invoke-Item -Path $GameFileCheatTable
+    Invoke-Item -Path $GameFileCheatTable -ErrorAction SilentlyContinue
     Wait-ProcessToCalm -ProcessToCalm $ArtmoneyProcess -CalmThreshold 10
   }  
   If (Test-Path -Path $ArtMoneyTable) 
@@ -1121,7 +1432,7 @@ function Start-Cheats
     $ArtMoney = $ArtMoneyDir + '\' + $ArtMoneyExe
     $ArtMoneyTableDir = $ArtMoneyTablesDir + '\' + $System
     $ArtMoneyArgument = '"' + $ArtMoneyTable + '"'
-    Invoke-Item -Path $ArtMoneyTable
+    Invoke-Item -Path $ArtMoneyTable -ErrorAction SilentlyContinue
     Wait-ProcessToCalm -ProcessToCalm $ArtmoneyProcess -CalmThreshold 10
     Get-Process -Name $ArtmoneyProcess -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty Id |
@@ -1135,7 +1446,7 @@ function Start-Cheats
     Say-Something -About LoadCheatTable -Modifier CheatEngine
     
     ('Loading {0} with {1}.' -f $CheatEngineTable, $CheatEngineName) | timestamp >> $LogFile
-    Invoke-Item -Path $CheatEngineTable
+    Invoke-Item -Path $CheatEngineTable -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 1
     Wait-ProcessToCalm -ProcessToCalm $CheatEngineProcess -CalmThreshold 10
   }
@@ -1143,7 +1454,7 @@ function Start-Cheats
   If (Test-Path -Path $CoSMOSTable) 
   {
     ('Loading {0} with {1}.' -f $CoSMOSTable, $CoSMOSName) | timestamp >> $LogFile
-    Invoke-Item -Path $CoSMOSTable
+    Invoke-Item -Path $CoSMOSTable -ErrorAction SilentlyContinue
     Wait-ProcessToCalm -ProcessToCalm $CoSMOSProcess
   }
   If (Test-Path -Path $UHSFile -ErrorAction SilentlyContinue) 
@@ -1152,7 +1463,7 @@ function Start-Cheats
 
     Say-Something -About OpenUHS
     
-    Invoke-Item -Path $UHSFile
+    Invoke-Item -Path $UHSFile -ErrorAction SilentlyContinue
     #Start-Sleep -Milliseconds 500
   }
   'Cheat-searching completed.' | timestamp >> $LogFile
@@ -1201,12 +1512,19 @@ function Set-DS4
   {
     'Making sure DS4Windows is running'
     Start-Process -FilePath "$DS4Folder\DS4Windows.exe" -WorkingDirectory $DS4Folder -Verb RunAs
-    Wait-ProcessToCalm -ProcessToCalm DS4Windows -CalmThreshold 5
+    Wait-ProcessToCalm -ProcessToCalm DS4Windows -CalmThreshold 10
   }
   $DS4Finished = $true
 }
 function Manage-DRMSystem
 {
+  $SteamPath = Get-Item -Path (((Get-Item -Path HKCU:\Software\Valve\Steam).GetValue('SteamEXE')).ToString()).Replace('steam.exe','')
+  $SteamEXE = Get-Item -Path ((Get-Item -Path HKCU:\Software\Valve\Steam).GetValue('SteamEXE')).ToString()
+  $SteamEXEs = (Get-ChildItem -Path $SteamPath -Filter '*.exe').FullName
+  $OriginPath = Get-Item -Path (((Get-Item -Path HKLM:\SOFTWARE\WOW6432Node\Origin).GetValue('ClientPath')).ToString()).Replace('Origin.exe','')
+  $OriginEXE = Get-Item -Path (((Get-Item -Path HKLM:\SOFTWARE\WOW6432Node\Origin).GetValue('ClientPath')).ToString())
+  $OriginEXEs = (Get-ChildItem -Path $OriginPath -Filter '*.exe').FullName
+  
   If ($System -eq 'Steam') 
   { 
     $DRMSystem = 'Steam'
@@ -1285,7 +1603,7 @@ function Manage-DRMSystem
   {
     If (Get-Process -Name 'Steam' -ErrorAction SilentlyContinue) 
     {
-      Start-Process -FilePath ((Get-Item -Path HKCU:\Software\Valve\Steam).GetValue('SteamExe')) -ArgumentList '-shutdown' -Wait
+      Start-Process -FilePath $SteamEXE -ArgumentList '-shutdown' -Wait
       'Closing Steam'
       Stop-Process -Name Steam -Force -ErrorAction SilentlyContinue
     }
@@ -1313,6 +1631,7 @@ function Manage-DRMSystem
   {
     If (Get-Process -Name 'origin' -ErrorAction SilentlyContinue) 
     {
+      Start-Process -FilePath $OriginEXE -ArgumentList 'origin://Quit' -Wait
       'Closing Origin'
       Stop-Process -Name origin -Force -ErrorAction SilentlyContinue
     }
@@ -1539,7 +1858,7 @@ function Ready-VR
     Set-Service -Name OVRLibraryService -StartupType Manual -ErrorAction SilentlyContinue
     Set-Service -Name OVRService -StartupType Manual -ErrorAction SilentlyContinue
     Start-Service -Name OVRService -ErrorAction SilentlyContinue
-    Wait-ProcessToCalm -ProcessToCalm OVRServer_x64 -CalmThreshold 5
+    Wait-ProcessToCalm -ProcessToCalm OVRServer_x64 -CalmThreshold 15
   }
   If (!(Get-Process -Name OculusClient -ErrorAction SilentlyContinue)) 
   { 
@@ -1551,8 +1870,15 @@ function Ready-VR
     
     Start-Service -Name OVRService -ErrorAction SilentlyContinue
     Start-Process -FilePath $OculusClient -WorkingDirectory $OculusClientDir -Verb RunAs
-    Wait-ProcessToCalm -ProcessToCalm OculusClient -CalmThreshold 5
-    Wait-ProcessToCalm -ProcessToCalm OculusDash -CalmThreshold 5
+    #Wait-WindowAppear -ProcessName OculusClient -ErrorAction SilentlyContinue
+    Wait-ProcessToCalm -ProcessToCalm OculusClient -CalmThreshold 15
+    If (!(Get-Process -Name OculusClient -ErrorAction SilentlyContinue)) 
+    {
+      Start-Process -FilePath $OculusClient -WorkingDirectory $OculusClientDir -Verb RunAs
+      #Wait-WindowAppear -ProcessName OculusClient -ErrorAction SilentlyContinue
+      Wait-ProcessToCalm -ProcessToCalm OculusClient -CalmThreshold 15
+    }
+    Wait-ProcessToCalm -ProcessToCalm OculusDash -CalmThreshold 20
     $WaitforOculus = 0
     While (!(Get-Process -Name OculusClient -ErrorAction SilentlyContinue)) 
     {
@@ -1598,6 +1924,8 @@ function Ready-VR
     Start-Sleep -Milliseconds 250
   }
   
+  $OculusEXEs = (Get-ChildItem -Path $env:OculusBase -Filter '*.exe' -Recurse).FullName
+  
   Wait-ProcessToCalm -ProcessToCalm OculusClient
   Wait-ProcessToCalm -ProcessToCalm OculusDash
   . Set-Audio
@@ -1635,7 +1963,9 @@ function Stop-VR
   Set-Service -Name OVRService -StartupType Disabled
   Stop-Service -Name OVRLibraryService -Force -ErrorAction SilentlyContinue -NoWait
   Stop-Service -Name OVRService -Force -ErrorAction SilentlyContinue -NoWait
-    
+  Stop-Process -Name OVRLibraryService -ErrorAction SilentlyContinue -Force
+  Stop-Process -Name OVRService -ErrorAction SilentlyContinue -Force
+      
   $VRProcesses = 'steamvr_tutorial', 'Steamtours', 'steamvr', 'vrmonitor', 'vrdashboard', 'vrcompositor', 'vrserver', 'OculusVR', 'Home-Win64-Shipping', 'Home2-Win64-Shipping', 'OculusClient', 'OVRRedir', 'OVRServiceLauncher', 'OVRServer_x64'
   ForEach ($VRPRocess in $VRProcesses) 
   {
@@ -1789,7 +2119,13 @@ function Detect-GameProcess
   $IgnoreProcesses = (Get-Content -Path $IgnoreProcessesFile -ErrorAction SilentlyContinue)
   $IgnoreDirectories = (Get-Content -Path $IgnoreDirectoriesFile -ErrorAction SilentlyContinue)
   $IgnoreDirectoriesEXEs = (Get-ChildItem -Path $IgnoreDirectories -Filter '*.exe').FullName | Get-Unique
-  
+  $SteamPath = Get-Item -Path (((Get-Item -Path HKCU:\Software\Valve\Steam).GetValue('SteamEXE')).ToString()).Replace('steam.exe','')
+  $SteamEXE = Get-Item -Path ((Get-Item -Path HKCU:\Software\Valve\Steam).GetValue('SteamEXE')).ToString()
+  $SteamEXEs = (Get-ChildItem -Path $SteamPath, "$SteamPath\bin" -Filter '*.exe').FullName
+  $OriginPath = Get-Item -Path (((Get-Item -Path HKLM:\SOFTWARE\WOW6432Node\Origin).GetValue('ClientPath')).ToString()).Replace('Origin.exe','')
+  $OriginEXE = Get-Item -Path (((Get-Item -Path HKLM:\SOFTWARE\WOW6432Node\Origin).GetValue('ClientPath')).ToString())
+  $OriginEXEs = (Get-ChildItem -Path $OriginPath -Filter '*.exe').FullName
+    
   If ($DetectionPhase -eq 'prepare')
   {
     $TimeOfPreparation = Get-Date
@@ -1798,6 +2134,11 @@ function Detect-GameProcess
     $BeforeGameProcesses = (Get-Process -ErrorAction SilentlyContinue |
       Where-Object -Property ProcessName -NotIn -Value $IgnoreProcesses |
       Where-Object -Property Path -NotIn -Value $IgnoreDirectoriesEXEs |
+      Where-Object -Property Path -NotIn -Value $SteamEXEs |
+      Where-Object -Property Path -NotIn -Value $OriginEXEs |
+      Where-Object -Property Path -NotLike -Value "$env:windir*" |
+      Where-Object -Property Path -NotLike -Value "$env:OculusBase*" |
+      Where-Object -Property Path -NotLike -Value '*\SteamVR\*' |
     Where-Object -Property ProcessName -NotLike -Value '*.tmp').ProcessName | Get-Unique
     ('Processes found: {0}' -f $BeforeGameProcesses.Count)
     $BeforeGameProcesses
@@ -1805,14 +2146,21 @@ function Detect-GameProcess
   }
   else
   {
+    Start-Sleep -Seconds 5
     Remove-Variable -Name NewProcesses -Force -ErrorAction SilentlyContinue
+    'Looking for the game process...'
     While ($NewProcesses.Count -lt 1) 
     {
-      Start-Sleep -Seconds 3
+      Start-Sleep -Seconds 5
       $AfterGameProcesses = (Get-Process -ErrorAction SilentlyContinue |
         Select-Object -Property ProcessName, Path |
         Where-Object -Property ProcessName -NotIn -Value $IgnoreProcesses |
         Where-Object -Property Path -NotIn -Value $IgnoreDirectoriesEXEs |
+        Where-Object -Property Path -NotIn -Value $SteamEXEs |
+        Where-Object -Property Path -NotIn -Value $OriginEXEs |
+        Where-Object -Property Path -NotLike -Value "$env:windir*" |
+        Where-Object -Property Path -NotLike -Value "$env:OculusBase*" |
+        Where-Object -Property Path -NotLike -Value '*\SteamVR\*' |
       Where-Object -Property ProcessName -NotLike -Value '*.tmp').ProcessName | Get-Unique
       $NewProcesses = (Compare-Object -ReferenceObject $BeforeGameProcesses -DifferenceObject $AfterGameProcesses -ErrorAction SilentlyContinue | Where-Object -Property SideIndicator -EQ -Value '=>').InputObject
     }
@@ -1820,11 +2168,12 @@ function Detect-GameProcess
     "Processes found: $NewProcess"
     ''
   
-    If (($NewProcess -like '*launch*') -or ($NewProcess -like '*start*'))
+    If (($NewProcess -like '*launch*') -or ($NewProcess -like '*start*') -or ($NewProcess -like '*update*') -or ($NewProcess -like '*install*') -or ($NewProcess -like '*config*') -or ($NewProcess -like '*setup*'))
     {
       Remove-Variable -Name NewProcesses -Force -ErrorAction SilentlyContinue
-      'Found something that looks like a launcher.'
       $RunningGameLauncher = $NewProcess
+      "Found something that looks like a launcher or installer: $RunningGameLauncher"
+      'Looking for the proper game process...'
       $WaitingForProperGameProcess = 0
       While (($NewProcesses.Count -lt 1) -and ($WaitingForProperGameProcess -lt 12))
       {
@@ -1953,6 +2302,15 @@ $GameDocsDir = (Get-INIValue -Path $INIFile -Section 'Directories' -Key 'GameDoc
 $TrainersDir = (Get-INIValue -Path $INIFile -Section 'Directories' -Key 'TrainersFolder')
 $UHSDir = (Get-INIValue -Path $INIFile -Section 'Directories' -Key 'UHSFolder')
 $UHSFile = "$UHSDir\$GameName.uhs"
+[string]$MoveWindowsTo2ndScreen = (Get-INIValue -Path $INIFile -Section 'Options' -Key 'MoveWindowsTo2ndScreen')
+IF ($MoveWindowsTo2ndScreen -eq '1')
+{
+  [bool]$MoveWindowsTo2ndScreen = $true
+}
+else 
+{
+  [bool]$MoveWindowsTo2ndScreen = $false
+}
 $DS4Folder = (Get-INIValue -Path $INIFile -Section 'Controllers' -Key 'DS4Folder')
 $UsePS4Pad = (Get-INIValue -Path $INIFile -Section 'Controllers' -Key 'UsePS4Pad')
 IF ($UsePS4Pad -eq '1')
@@ -2066,7 +2424,10 @@ $GameTrainers = Get-ChildItem -Path $TrainersDir -Filter '*.exe' | Where-Object 
 $IgnoreProcesses = (Get-Content -Path $IgnoreProcessesFile -ErrorAction SilentlyContinue)
 $IgnoreDirectories = (Get-Content -Path $IgnoreDirectoriesFile -ErrorAction SilentlyContinue)
 $IgnoreDirectoriesEXEs = (Get-ChildItem -Path $IgnoreDirectories -Filter '*.exe').FullName
-
+$SteamPath = Get-Item -Path (((Get-Item -Path HKCU:\Software\Valve\Steam).GetValue('SteamEXE')).ToString()).Replace('steam.exe','')
+$SteamEXE = Get-Item -Path ((Get-Item -Path HKCU:\Software\Valve\Steam).GetValue('SteamEXE')).ToString()
+$OriginPath = Get-Item -Path (((Get-Item -Path HKLM:\SOFTWARE\WOW6432Node\Origin).GetValue('ClientPath')).ToString()).Replace('Origin.exe','')
+$OriginEXE = Get-Item -Path (((Get-Item -Path HKLM:\SOFTWARE\WOW6432Node\Origin).GetValue('ClientPath')).ToString())
 $CurrentGameDocsDir = $GameDocsDir + '\' + $GameName
 $LogFileSystemDir = $LogFileDir + '\' + $System
 
@@ -2097,19 +2458,22 @@ function Start-Windows
   {
     'Checking for reshade...'
     $GameShortcut = Get-Shortcut -Path $Game
-    $GamePath = ($GameShortcut.TargetPath).Replace($GameShortcut.Target,'')
-    $ReshadeFiles = Get-ItemProperty -Path ($GamePath + 'd3d9.dll'), ($GamePath + 'dxgi.dll'), ($GamePath + 'opengl32.dll') -ErrorAction SilentlyContinue
-    ForEach ($ReshadeFile in $ReshadeFiles)
-    {
-      If ($ReshadeFile.VersionInfo.ProductName -eq 'ReShade') 
+    If (!(($GameShortcut.TargetPath -notlike "*\*") -or ($GameShortcut.Target -eq 'n/a')))
+    { 
+      $GamePath = ($GameShortcut.TargetPath).Replace($GameShortcut.Target,'')
+      $ReshadeFiles = Get-ItemProperty -Path ($GamePath + 'd3d9.dll'), ($GamePath + 'dxgi.dll'), ($GamePath + 'opengl32.dll') -ErrorAction SilentlyContinue
+      ForEach ($ReshadeFile in $ReshadeFiles)
       {
-        'Reshade found.'
-        $Reshade = $true
+        If ($ReshadeFile.VersionInfo.ProductName -eq 'ReShade') 
+        {
+          'Reshade found.'
+          $Reshade = $true
+        }
       }
-    }
-    If ($Reshade -eq $true) 
-    {
-      . Update-ReShade
+      If ($Reshade -eq $true) 
+      {
+        . Update-ReShade
+      }
     }
   }
   
@@ -2119,13 +2483,30 @@ function Start-Windows
   $GameLink = Get-Item -Path $Game
   Try
   {
-    Invoke-Item -Path $GameLink -ErrorAction Continue
+    Invoke-Item -Path $GameLink -ErrorAction SilentlyContinue
   }
   Catch
   {
-    Invoke-Item -Path "$Game" -ErrorAction Continue
+    Invoke-Item -Path "$Game" -ErrorAction SilentlyContinue
   }
   ''
+
+  If (Get-Process -Name Origin -ErrorAction SilentlyContinue) 
+  {
+    Wait-ProcessToCalm -ProcessToCalm origin -CalmThreshold 10
+  }
+  If (Get-Process -Name Steam -ErrorAction SilentlyContinue) 
+  {
+    Wait-ProcessToCalm -ProcessToCalm steam -CalmThreshold 10
+  }
+  If ($System -eq 'VR') 
+  {
+    Wait-ProcessToCalm -ProcessToCalm oculusclient -CalmThreshold 10
+    Wait-ProcessToCalm -ProcessToCalm steamvr -CalmThreshold 10
+  }
+  Get-Process '*update*', '*install*' -ErrorAction SilentlyContinue | ForEach-Object -Process {
+    Wait-ProcessToCalm -ProcessToCalm oculusclient -CalmThreshold 5
+  }
 
   . Detect-GameProcess
   
@@ -2138,7 +2519,12 @@ function Start-Windows
       ('Setting {0} to high.' -f $NewProcess)
       Try 
       {
+        Wait-WindowAppear -ProcessName $NewProcess -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 5
+        If ([int](Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).MainWindowHandle -gt 0)
+      { 
+        Focus-Process -ProcessName $NewProcess -ErrorAction SilentlyContinue
+      }
         (Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
       }
       Catch 
@@ -2150,8 +2536,20 @@ function Start-Windows
     ('Waiting for:  {0}' -f $NewProcess)
     If (Get-Process -Name $NewProcess -ErrorAction SilentlyContinue) 
     {
-      Start-Sleep -Seconds 2
-      Focus-Process -ProcessName $NewProcess -ErrorAction SilentlyContinue
+      Try 
+      {
+        Wait-WindowAppear -ProcessName $NewProcess -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 5
+        If ([int](Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).MainWindowHandle -gt 0)
+      { 
+        Focus-Process -ProcessName $NewProcess -ErrorAction SilentlyContinue
+      }
+        (Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
+      }
+      Catch 
+      {
+        'Cannot set Priority.'
+      }
     }
     Get-Process -Name $NewProcess -ErrorAction SilentlyContinue | Wait-Process
     $WaitingForGameProcess = $WaitingForGameProcess + 1
@@ -2189,6 +2587,7 @@ function Start-VR
     Say-Something -About StartOculusClient
     
     Start-Process -FilePath $OculusClient -WorkingDirectory $OculusClientDir -Verb RunAs
+    #Wait-WindowAppear -ProcessName OculusClient -ErrorAction SilentlyContinue
     Wait-ProcessToCalm -ProcessToCalm OculusClient -CalmThreshold 5
   }
   $WaitforOculus = 0
@@ -2288,6 +2687,7 @@ function Start-Amiga
   $CurrentGameProcess = Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue
   Try 
   {
+    Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
     (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
     Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
   }
@@ -2317,6 +2717,10 @@ function Start-Mednafen
   $CurrentGameProcess = Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue
   Try 
   {
+    If (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue) 
+    {
+      Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
+    }
     $CurrentGameProcess.PriorityClass = 'HIGH'
     (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
     Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
@@ -2361,6 +2765,10 @@ function Start-Emulator
     {
       Try 
       {
+        If (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue) 
+        {
+          Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
+        }
         $CurrentGameProcess.PriorityClass = 'HIGH'
         (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
         Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
@@ -2393,6 +2801,10 @@ function Start-ScummVM
   $CurrentGameProcess = Get-Process -Name scummvm -ErrorAction SilentlyContinue
   Try 
   {
+    If (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue) 
+    {
+      Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
+    }
     $CurrentGameProcess.PriorityClass = 'HIGH'
     (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
     Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
@@ -2447,6 +2859,10 @@ function Start-C64
   $CurrentGameProcess = Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue
   Try 
   {
+    If (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue) 
+    {
+      Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
+    }
     $CurrentGameProcess.PriorityClass = 'HIGH'
     (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
     Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
@@ -2481,6 +2897,10 @@ function Start-DOS
   $CurrentGameProcess = Get-Process -Name '*dosbox*' -ErrorAction SilentlyContinue
   Try 
   {
+    If (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue) 
+    {
+      Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
+    }
     $CurrentGameProcess.PriorityClass = 'HIGH'
     (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
     Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
@@ -2535,6 +2955,7 @@ function Start-NintendoDS
   $CurrentGameProcess = Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue
   Try 
   {
+    Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
     $CurrentGameProcess.PriorityClass = 'HIGH'
     (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
     Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
@@ -2580,6 +3001,7 @@ function Start-PS2
   $CurrentGameProcess = Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue
   Try 
   {
+    Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
     $CurrentGameProcess.PriorityClass = 'HIGH'
     (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
     Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
@@ -2637,6 +3059,7 @@ function Start-Dolphin
   $CurrentGameProcess = Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue
   Try 
   {
+    Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
     $CurrentGameProcess.PriorityClass = 'HIGH'
     (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
     Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
@@ -2677,6 +3100,7 @@ function Start-RetroArch
   $CurrentGameProcess = Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue
   Try 
   {
+    Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
     (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
     Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
     $CurrentGameProcess.PriorityClass = 'HIGH'
@@ -2710,7 +3134,7 @@ function Start-Android
   ('Processes found: {0}' -f $BeforeGameProcesses.Count)
 
   "Invoking $Game"
-  Invoke-Item -Path $Game
+  Invoke-Item -Path $Game -ErrorAction SilentlyContinue
 
   Start-Sleep -Seconds 1
   $AfterGameProcesses = (Get-Process -ErrorAction SilentlyContinue |
@@ -2738,6 +3162,7 @@ function Start-Android
     ('Setting {0} to high.' -f $RunningGameProcess)
     Try 
     {
+      Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
       (Get-Process -Name $RunningGameProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
       Focus-Process -ProcessName $RunningGameProcess -ErrorAction SilentlyContinue
     }
@@ -2898,6 +3323,32 @@ If ($UseDisplayFusion -eq $true)
   else
   {
     Start-Process -FilePath "${env:ProgramFiles(x86)}\DisplayFusion\displayfusioncommand.exe" -ArgumentList ('-functionrun "' + (Get-INIValue -Path $INIFile -Section 'DisplayFusion' -Key 'Function') + '"') -Wait
+  }
+}
+If ($MoveWindowsTo2ndScreen -eq $true)
+{
+  'Moving Windows to 2nd screen...'
+  $OpenWindows = Get-Process -ErrorAction SilentlyContinue |
+  Where-Object -Property ProcessName -NE -Value '' |
+  Where-Object -Property MainWindowHandle -NE -Value 0 |
+  Where-Object -Property ProcessName -NE -Value $null |
+  Where-Object -Property ProcessName -NE -Value 'explorer'
+  
+  ForEach ($OpenWindow in $OpenWindows)
+  {
+    If ((Get-Process -Name $OpenWindow.ProcessName -ErrorAction SilentlyContinue) -and (!(((Get-WindowSizeAndPos -ProcessName $OpenWindow.ProcessName -ErrorAction SilentlyContinue).TopLeft.X -lt 0) -and ((Get-WindowSizeAndPos -ProcessName $OpenWindow.ProcessName -ErrorAction SilentlyContinue).TopLeft.Y -lt 0))))
+    { 
+      ('Moving {0} to display 2...' -f $OpenWindow.ProcessName)
+      Set-WindowStyle -ProcessName (Get-Process -Name $OpenWindow.ProcessName -ErrorAction SilentlyContinue).ProcessName -Style RESTORE -ErrorAction SilentlyContinue
+      Move-Window -ProcessName (Get-Process -Name $OpenWindow.ProcessName -ErrorAction SilentlyContinue).ProcessName -center -Screen 2 -ErrorAction SilentlyContinue
+    }
+  }
+  ''
+  #Get-Process opera, firefox, chrome, steam, origin -ErrorAction SilentlyContinue | Set-WindowStyle -Style MAXIMIZE -ErrorAction SilentlyContinue
+  #Get-Process -Name *read* -ErrorAction SilentlyContinue | Focus-Process -ErrorAction SilentlyContinue
+  If (Get-Process -Name *read* -ErrorAction SilentlyContinue) 
+  {
+    Get-Process -Name *read* -ErrorAction SilentlyContinue | Set-WindowStyle -Style SHOWMAXIMIZED -ErrorAction SilentlyContinue
   }
 }
 
@@ -3097,6 +3548,7 @@ ForEach ($ChangedProcess in $ProcessesChanged)
   }
 }
 
+$shell.MinimizeAll()
 
 If ((Get-ChildItem -Path $CurrentGameDocsDir -Recurse | Measure-Object).Count -eq 0) 
 {
