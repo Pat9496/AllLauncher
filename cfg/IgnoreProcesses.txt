@@ -2,6 +2,11 @@ ActivationUI
 ApplicationFrameHost
 autoupdate
 autoupdater
+CCleaner
+CCleaner32
+CCleaner64
+CCUpdate
+CCUpdater
 chrome
 CrashReporter
 CrashReportClient
@@ -73,6 +78,7 @@ SgrmBroker
 Steam
 SteamService
 steamwebhelper
+steamvr
 svchost
 svhost
 System
@@ -148,3 +154,5 @@ uTorrent
 WindowsInternal.ComposableShell.Experiences.TextInput.InputApp
 IndianaWindowsStore-Win64-Shipping
 Store-Win64-Shipping
+Vdfs32g
+OriginThinSetupInternal

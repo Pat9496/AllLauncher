@@ -15,7 +15,6 @@ Chasm
 Yakuza 0
 METAL GEAR SOLID V THE PHANTOM PAIN
 Dragon Quest XI - Echoes of an Elusive Age
-Forza Horizon 4
 Shadow of the Tomb Raider
 Assassin's Creed Origin
 Assassin's Creed Odyssey
@@ -24,3 +23,4 @@ Bloodstained Curse of the Moon
 Octopath Traveler
 FoxTail
 Star Wars Jedi Fallen Order
+Forza Horizon 4

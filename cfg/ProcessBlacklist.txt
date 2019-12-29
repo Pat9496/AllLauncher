@@ -4,6 +4,11 @@
 BorderlessGaming
 Calc
 Calculator
+CCleaner
+CCleaner32
+CCleaner64
+CCUpdate
+CCUpdater
 CompatTelRunner
 Dopamine
 ENBInjector
@@ -26,6 +31,10 @@ LockApp
 MEGASync
 MicrosoftEdge
 notepad
+opera_autoupdate
+opera_autoupdater
+opera_gx_splash
+opera_crashreporter
 PicasaPhotoViewer
 Pocket Casts
 PocketCasts

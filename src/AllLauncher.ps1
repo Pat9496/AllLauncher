@@ -410,7 +410,7 @@ Function Move-Window
   { 
     #$WindowSizeandPos = Get-WindowSizeAndPos -MainWindowHandle $Handle
     $Rectangle = New-Object -TypeName RECT
-    #[Window]::GetWindowRect($Handle,[ref]$Rectangle)
+    $null = [Window]::GetWindowRect($Handle,[ref]$Rectangle)
     $Return = [Window]::GetWindowRect($Handle,[ref]$Rectangle)
     If (($Rectangle.Left -ge $PrimaryMonitor.Left) -and ($Rectangle.Right -le $PrimaryMonitor.Right))
     {
@@ -458,7 +458,7 @@ Function Move-Window
       }
       else
       { 
-        [int]$NewPosX = ($Rectangle.Left + (($SecondaryScreen.Size.Width - ($Rectangle.Right - $Rectangle.Left))/2))
+        [int]$NewPosX = ($SecondaryScreen.Left + (($SecondaryScreen.Size.Width - ($Rectangle.Right - $Rectangle.Left))/2))
         [int]$NewPosY = ($SecondaryScreen.Top + (($SecondaryScreen.Size.Height - ($Rectangle.Bottom - $Rectangle.Top))/2))
       }
     }
@@ -871,7 +871,7 @@ function Say-Something
           $Greeting = 'Good Evening'
         }
       
-        $Callsign = Get-Random -Maximum ('', $env:Username, 'Sir')
+        $Callsign = Get-Random -Maximum ('', "$env:Username", "$MyName", "$CallMe")
         $Today = Get-Random -Maximum ('Today is', "It's", 'It is', "Today's")
         $TodaysDay = Get-Date -Format 'dddd'
         $TodaysDate = (Get-Date -Format ' d').Replace(' ','')
@@ -897,21 +897,21 @@ function Say-Something
         If ((Get-Date -Format ddMM) -eq 2412) 
         {
           $SpecialGreeting = "Merry Christmas $Callsign."
-          $Today = "$Today christmas eve"
+          $Today = "$Today christmas eve, "
         }
         If ((Get-Date -Format ddMM) -eq 2512) 
         {
           $SpecialGreeting = "Merry Christmas $Callsign."
-          $Today = "$Today christmas day"
+          $Today = "$Today christmas day, "
         }
         If ((Get-Date -Format ddMM) -eq 3112) 
         {
-          $Today = "$Today new year's eve"
+          $Today = "$Today new year's eve, "
         }
         If ((Get-Date -Format ddMM) -eq 0101) 
         {
           $SpecialGreeting = "Happy new year $Callsign."
-          $Today = "$Today new year's day"
+          $Today = "$Today new year's day, "
         }
             
         $SayThis = ("$Greeting $Callsign. - $Today $TodaysDay, the $TodaysDate$DatesTH of $MonthAndYear. $SpecialGreeting")
@@ -1659,7 +1659,12 @@ function Close-UnneededStuff
   Get-Process -Name '*trainer*' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
   Get-Process -Name '*midi*' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
   Get-Process -Name '*MIDISynth*' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-  
+  $CloseProcesses = Get-Process -Name '*launch*','*start*','*conf*','*setup*','*inst*','*store*','*upd*' -ErrorAction SilentlyContinue | Where-Object -Property ProcessName -ne $LauncherProcess | Where-Object -Property Id -ne $pid
+    ForEach ($CloseProcess in $CloseProcesses) 
+    { 
+      $null = $CloseProcess.CloseMainWindow()
+    }
+    
   ForEach ($DeviceNumber in 0..9) 
   {
     Get-DiskImage -DevicePath "\\.\CDROM$DeviceNumber" -ErrorAction SilentlyContinue | Dismount-DiskImage
@@ -2269,6 +2274,8 @@ IF ($Menu -eq $true)
 IF ($TTSFeature -eq '1')
 {
   [bool]$TTSFeature = $true
+  $MyName = (Get-INIValue -Path $INIFile -Section 'Options' -Key 'MyName')
+  $CallMe = (Get-INIValue -Path $INIFile -Section 'Options' -Key 'CallMe')
   . Say-Something
 }
 else 
@@ -2522,9 +2529,9 @@ function Start-Windows
         Wait-WindowAppear -ProcessName $NewProcess -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 5
         If ([int](Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).MainWindowHandle -gt 0)
-      { 
-        Focus-Process -ProcessName $NewProcess -ErrorAction SilentlyContinue
-      }
+        { 
+          Focus-Process -ProcessName $NewProcess -ErrorAction SilentlyContinue
+        }
         (Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
       }
       Catch 
@@ -2541,9 +2548,9 @@ function Start-Windows
         Wait-WindowAppear -ProcessName $NewProcess -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 5
         If ([int](Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).MainWindowHandle -gt 0)
-      { 
-        Focus-Process -ProcessName $NewProcess -ErrorAction SilentlyContinue
-      }
+        { 
+          Focus-Process -ProcessName $NewProcess -ErrorAction SilentlyContinue
+        }
         (Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
       }
       Catch 
@@ -2605,8 +2612,8 @@ function Start-VR
     }
   }
   
-  Wait-ProcessToCalm -ProcessToCalm OVRServiceLauncher -CalmThreshold 5
-  Wait-ProcessToCalm -ProcessToCalm OVRServer_x64 -CalmThreshold 5
+  #Wait-ProcessToCalm -ProcessToCalm OVRServiceLauncher -CalmThreshold 5
+  #Wait-ProcessToCalm -ProcessToCalm OVRServer_x64 -CalmThreshold 5
   Wait-ProcessToCalm -ProcessToCalm OculusClient -CalmThreshold 5
   Wait-ProcessToCalm -ProcessToCalm OculusDash -CalmThreshold 5
     
@@ -3261,7 +3268,7 @@ IF ($Game -like '*.lnk')
 
 $IgnoreDirectories = (Get-Content -Path $IgnoreDirectoriesFile -ErrorAction SilentlyContinue)
 $IgnoreDirectoriesEXEs = (Get-ChildItem -Path $IgnoreDirectories -Filter '*.exe').FullName
-$ProcessesBefore = Get-Process | Where-Object -Property Path -NotIn -Value $IgnoreDirectoriesEXEs
+$ProcessesBefore = Get-Process
 
 If (Test-Path -Path $MIDISynthEXE) 
 {
@@ -3339,7 +3346,7 @@ If ($MoveWindowsTo2ndScreen -eq $true)
     If ((Get-Process -Name $OpenWindow.ProcessName -ErrorAction SilentlyContinue) -and (!(((Get-WindowSizeAndPos -ProcessName $OpenWindow.ProcessName -ErrorAction SilentlyContinue).TopLeft.X -lt 0) -and ((Get-WindowSizeAndPos -ProcessName $OpenWindow.ProcessName -ErrorAction SilentlyContinue).TopLeft.Y -lt 0))))
     { 
       ('Moving {0} to display 2...' -f $OpenWindow.ProcessName)
-      Set-WindowStyle -ProcessName (Get-Process -Name $OpenWindow.ProcessName -ErrorAction SilentlyContinue).ProcessName -Style RESTORE -ErrorAction SilentlyContinue
+      #Set-WindowStyle -ProcessName (Get-Process -Name $OpenWindow.ProcessName -ErrorAction SilentlyContinue).ProcessName -Style RESTORE -ErrorAction SilentlyContinue
       Move-Window -ProcessName (Get-Process -Name $OpenWindow.ProcessName -ErrorAction SilentlyContinue).ProcessName -center -Screen 2 -ErrorAction SilentlyContinue
     }
   }
@@ -3348,6 +3355,8 @@ If ($MoveWindowsTo2ndScreen -eq $true)
   #Get-Process -Name *read* -ErrorAction SilentlyContinue | Focus-Process -ErrorAction SilentlyContinue
   If (Get-Process -Name *read* -ErrorAction SilentlyContinue) 
   {
+    Get-Process -Name *read* -ErrorAction SilentlyContinue | Set-WindowStyle -Style RESTORE -ErrorAction SilentlyContinue
+    Get-Process -Name *read* -ErrorAction SilentlyContinue | Move-Window -center -Screen 2 -ErrorAction SilentlyContinue
     Get-Process -Name *read* -ErrorAction SilentlyContinue | Set-WindowStyle -Style SHOWMAXIMIZED -ErrorAction SilentlyContinue
   }
 }
@@ -3451,6 +3460,12 @@ ForEach ($GameTrainer in $GameTrainers)
   Stop-Process -Name $GameTrainer -Force -ErrorAction SilentlyContinue
 }
 
+$CloseProcesses = Get-Process -Name '*launch*','*start*','*conf*','*setup*' -ErrorAction SilentlyContinue | Where-Object -Property ProcessName -ne $LauncherProcess | Where-Object -Property Id -ne $pid
+    ForEach ($CloseProcess in $CloseProcesses) 
+    { 
+      $null = $CloseProcess.CloseMainWindow()
+    }
+
 [timespan]$Playtime = $EndDate - $StartDate
 'Calculating time played...' | timestamp >> $LogFile
 'Calculating time played...'
@@ -3523,8 +3538,7 @@ else
 
 
 'Getting processes still open...'
-$ProcessesAfter = Get-Process |
-Where-Object -Property Path -NotIn -Value $IgnoreDirectoriesEXEs
+$ProcessesAfter = Get-Process 
 $ProcessesChanged = Compare-Object -ReferenceObject $ProcessesBefore -DifferenceObject $ProcessesAfter -PassThru |
 Where-Object -Property SideIndicator -EQ -Value '=>' 
 "Open processes:  $ProcessesChanged"
@@ -3536,14 +3550,12 @@ If ($ProcessesChanged.Count -lt 1)
 'Closing open processes...'
 ForEach ($ChangedProcess in $ProcessesChanged) 
 { 
-  If (($ChangedProcess.Name -ne 'explorer') -and ($ChangedProcess.Path -notin $IgnoreDirectoriesEXEs))
+  If ($ChangedProcess.Name -ne 'explorer')
   {
     $CloseProcesses = Get-Process -Name $ChangedProcess.Name -ErrorAction SilentlyContinue
     ForEach ($CloseProcess in $CloseProcesses) 
     { 
-      $CloseProcess.CloseMainWindow()
-      Wait-Process -Name $CloseProcess -Timeout 2 -ErrorAction SilentlyContinue
-      Stop-Process -Name $CloseProcess -Force -ErrorAction SilentlyContinue
+      $null = $CloseProcess.CloseMainWindow()
     }
   }
 }
