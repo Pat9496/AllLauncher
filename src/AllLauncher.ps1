@@ -60,6 +60,7 @@ $IgnoreProcessesFile = ('{0}\IgnoreProcesses.txt' -f $CFGDir)
 $IgnoreDirectoriesFile = ('{0}\IgnoreDirectories.txt' -f $CFGDir)
 $DS4BlacklistFile = ('{0}\DS4SystemBlacklist.txt' -f $CFGDir)
 $DS4WindowsBlacklistFile = ('{0}\DS4WindowsBlacklist.txt' -f $CFGDir)
+$HOTASGamesFile = ('{0}\HOTASGames.txt' -f $CFGDir)
 $BorderlessGamesList = ('{0}\BorderlessGamesList.txt' -f $CFGDir)
 $MIDISynthGamesFile = ('{0}\MIDISynthGames.txt' -f $CFGDir)
 $MIDISynthSystemsFile = ('{0}\MIDISynthSystems.txt' -f $CFGDir)
@@ -934,6 +935,12 @@ function Say-Something
       $SayThis = (Get-Random -Maximum ("$ReturningTo $LauncherName.", "$LauncherName $IsRestarting.", "Displaying $LauncherName again.", "Showing $LauncherName again."))
     }
 
+    If ($About -eq 'HOTAS') 
+    {
+      $HOTAS = (Get-Random -Maximum ('HOTAS control', 'flightstick control', 'use of HOTAS controller', 'use of flightstick controllers'))
+      $SayThis = "This game is configured for $HOTAS."
+    }
+    
     If ($About -eq 'StartLauncher') 
     {
       $ReturningTo = (Get-Random -Maximum ('Starting', 'Opening', 'Loading', "Let's go to", 'Displaying', 'Initializing', 'Showing', 'Starting', 'Loading'))
@@ -978,7 +985,12 @@ function Say-Something
       $SVRstartG = (Get-Random -Maximum ('starting', 'loading', 'entering'))
       $SayThis = "Steam VR $SVRloaded. $SVRfinally $SVRstartG game."
     }
-  
+
+    If ($About -eq 'JoyMapper') 
+    {
+      $SayThis = (Get-Random -Maximum ("A controller mapping is used for this $Modifier.", "Starting JoyMapper associated with this $Modifier.", "For this $Modifier, keyboard commands are mapped to your controller.", "Controller Mapping profile for this $Modifier found."))
+    }
+      
     If ($About -eq 'OpenGameDocs') 
     {
       $GDOpening = (Get-Random -Maximum ('Opening', 'Displaying', 'Readying', 'Loading', 'Preparing'))
@@ -1161,8 +1173,7 @@ function Start-Launcher
     
   'Resetting Explorer...'
   Stop-Process -Name Explorer -ErrorAction SilentlyContinue -Force
-
-    
+  
   If ($UsePS4Pad -eq $true) 
   {
     . Set-DS4
@@ -1218,7 +1229,7 @@ function Start-Launcher
   Wait-ProcessToCalm -ProcessToCalm $LauncherProcess -CalmThreshold 60
   Move-Window -ProcessName $LauncherProcess -X $PrimaryScreen.Top -Y $PrimaryScreen.Left -Width $PrimaryScreen.Right -Height $PrimaryScreen.Bottom -Screen 1
   Set-WindowStyle -ProcessName $LauncherProcess -Style MAXIMIZE -ErrorAction SilentlyContinue
-  Focus-Process -ProcessName $LauncherProcess -ErrorAction SilentlyContinue
+  #Focus-Process -ProcessName $LauncherProcess -ErrorAction SilentlyContinue
     
   Say-Something -About Ready
   
@@ -1238,14 +1249,13 @@ function Start-Launcher
   'Ending.' | timestamp >> $LogFile
   Stop-Transcript -ErrorAction SilentlyContinue
   Get-Process -Name 'powershell', 'alllauncher' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  Stop-Process -Name AllLauncher -Force -ErrorAction SilentlyContinue
+  Stop-Process -Name Powershell -Force -ErrorAction SilentlyContinue
   If ((Get-Process -Id $pid -ErrorAction SilentlyContinue).Name -ne 'powershell_ise') 
   { 
     Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
     exit
   }
-  Activate-App -Application $LauncherProcess -ErrorAction SilentlyContinue
-  Stop-Process -Name AllLauncher -Force -ErrorAction SilentlyContinue
-  Stop-Process -Name Powershell -Force -ErrorAction SilentlyContinue
   Exit
 }
 function Quit-Launcher 
@@ -1401,13 +1411,13 @@ function Start-Cheats
       ('Opening {0}.' -f $GameTrainer)
       Start-Process -FilePath $GameTrainer -WorkingDirectory $TrainersDir -Verb runas
       $GameTrainerProcess = Get-Process -Name (((($GameTrainer.Name).split('\'))[-1]).replace('.exe','')) -ErrorAction SilentlyContinue
-      Wait-ProcessToCalm -ProcessToCalm $GameTrainerProcess.Name
+      Wait-ProcessToCalm -ProcessToCalm $GameTrainerProcess.Name -CalmThreshold 15
       If (Get-Process -Name '*.tmp'-ErrorAction SilentlyContinue) 
       {
         $CalmingTMPProcesses = (Get-Process -Name '*.tmp'-ErrorAction SilentlyContinue).Name
         ForEach ($CalmingTMPProcess in $CalmingTMPProcesses)
         {
-          Wait-ProcessToCalm -ProcessToCalm $CalmingTMPProcess -CalmThreshold 12
+          Wait-ProcessToCalm -ProcessToCalm $CalmingTMPProcess -CalmThreshold 20
         }
       }
     }
@@ -1422,7 +1432,7 @@ function Start-Cheats
     ('Loading {0} with {1}.' -f $GameFileCheatTable, $ArtMoneyName) | timestamp >> $LogFile
     $ArtMoneyArgument = '"' + $GameFileCheatTable + '"'
     Invoke-Item -Path $GameFileCheatTable -ErrorAction SilentlyContinue
-    Wait-ProcessToCalm -ProcessToCalm $ArtmoneyProcess -CalmThreshold 10
+    Wait-ProcessToCalm -ProcessToCalm $ArtmoneyProcess -CalmThreshold 15
   }  
   If (Test-Path -Path $ArtMoneyTable) 
   {
@@ -1433,7 +1443,7 @@ function Start-Cheats
     $ArtMoneyTableDir = $ArtMoneyTablesDir + '\' + $System
     $ArtMoneyArgument = '"' + $ArtMoneyTable + '"'
     Invoke-Item -Path $ArtMoneyTable -ErrorAction SilentlyContinue
-    Wait-ProcessToCalm -ProcessToCalm $ArtmoneyProcess -CalmThreshold 10
+    Wait-ProcessToCalm -ProcessToCalm $ArtmoneyProcess -CalmThreshold 15
     Get-Process -Name $ArtmoneyProcess -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty Id |
     Activate-App -ErrorAction SilentlyContinue
@@ -1448,7 +1458,7 @@ function Start-Cheats
     ('Loading {0} with {1}.' -f $CheatEngineTable, $CheatEngineName) | timestamp >> $LogFile
     Invoke-Item -Path $CheatEngineTable -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 1
-    Wait-ProcessToCalm -ProcessToCalm $CheatEngineProcess -CalmThreshold 10
+    Wait-ProcessToCalm -ProcessToCalm $CheatEngineProcess -CalmThreshold 15
   }
   $CoSMOSTable = $CoSMOSTablesDir + '\' + $GameName + '.' + $CoSMOSExt
   If (Test-Path -Path $CoSMOSTable) 
@@ -1469,12 +1479,43 @@ function Start-Cheats
   'Cheat-searching completed.' | timestamp >> $LogFile
   $CheatsReady = $true
 }
+function Set-HOTAS
+{
+  $HOTASGames = Get-Content -Path $HOTASGamesFile -ErrorAction SilentlyContinue
+  
+  If (($HOTASGames -contains $GameName) -and (Get-PnpDevice -FriendlyName "*$HOTAS*"))
+  { 
+    Say-Something -About HOTAS
+    $UseDS4 = $false
+    
+    Get-PnpDevice -FriendlyName '*xbox*' -ErrorAction SilentlyContinue | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+    Stop-Process -Name 'DS4Windows' -Force -ErrorAction SilentlyContinue
+    Get-PnpDevice -FriendlyName '*game*controller*' -ErrorAction SilentlyContinue | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+    Get-PnpDevice -FriendlyName '*game*controller*' -ErrorAction SilentlyContinue | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+    Get-PnpDevice -Class HIDClass -ErrorAction SilentlyContinue |
+    Where-Object -FilterScript {
+      $_.HardwareID.Contains('HID_DEVICE_SYSTEM_GAME')
+    } |
+    Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+    Get-PnpDevice -FriendlyName "*$HOTAS*" -ErrorAction SilentlyContinue | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+      
+    Get-PnpDevice -FriendlyName "*$HOTAS*" -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+    Get-PnpDevice -FriendlyName "*$HOTAS*" -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+    Get-PnpDevice -FriendlyName '*hid*' -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+  }
+}
 function Set-DS4 
 {
   $DS4Blacklist = Get-Content -Path $DS4BlacklistFile -ErrorAction SilentlyContinue
+  Get-PnpDevice -FriendlyName '*xbox*' -ErrorAction SilentlyContinue | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
   Stop-Process -Name 'DS4Windows' -Force -ErrorAction SilentlyContinue
   Get-PnpDevice -FriendlyName '*game*controller*' -ErrorAction SilentlyContinue | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
   Get-PnpDevice -FriendlyName '*game*controller*' -ErrorAction SilentlyContinue | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+  Get-PnpDevice -Class HIDClass -ErrorAction SilentlyContinue |
+  Where-Object -FilterScript {
+    $_.HardwareID.Contains('HID_DEVICE_SYSTEM_GAME')
+  } |
+  Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
   
   Get-PnpDevice -FriendlyName '*game*controller*' -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
   Get-PnpDevice -FriendlyName '*game*controller*' -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
@@ -1512,9 +1553,30 @@ function Set-DS4
   {
     'Making sure DS4Windows is running'
     Start-Process -FilePath "$DS4Folder\DS4Windows.exe" -WorkingDirectory $DS4Folder -Verb RunAs
-    Wait-ProcessToCalm -ProcessToCalm DS4Windows -CalmThreshold 10
+    Wait-ProcessToCalm -ProcessToCalm DS4Windows -CalmThreshold 11
+    Get-PnpDevice -FriendlyName '*xbox*' -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
   }
   $DS4Finished = $true
+}
+function Set-JoyMapper
+{
+  'Checking for profile file...'
+  $JoyMapperSystemProfile = $JoyMapperDir + '\' + $System + '.' + $JoyMapperExt
+  $JoyMapperGameProfile = $JoyMapperDir + '\' + $GameName + '.' + $JoyMapperExt
+  Stop-Process -Name "*$JoyMapperProcess*" -Force -ErrorAction SilentlyContinue
+  If (Test-Path $JoyMapperSystemProfile -ErrorAction SilentlyContinue) 
+  {
+    "$JoyMapperSystemProfile found!"
+    Say-Something -About JoyMapper -Modifier System
+    Invoke-Item $JoyMapperSystemProfile -ErrorAction SilentlyContinue
+  }
+  If (Test-Path $JoyMapperGameProfile -ErrorAction SilentlyContinue) 
+  {
+    "$JoyMapperGameProfile found!"
+    Stop-Process -Name "*$JoyMapperProcess*" -Force -ErrorAction SilentlyContinue
+    Say-Something -About JoyMapper -Modifier Game
+    Invoke-Item $JoyMapperGameProfile -ErrorAction SilentlyContinue
+  }
 }
 function Manage-DRMSystem
 {
@@ -1659,11 +1721,14 @@ function Close-UnneededStuff
   Get-Process -Name '*trainer*' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
   Get-Process -Name '*midi*' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
   Get-Process -Name '*MIDISynth*' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-  $CloseProcesses = Get-Process -Name '*launch*','*start*','*conf*','*setup*','*inst*','*store*','*upd*' -ErrorAction SilentlyContinue | Where-Object -Property ProcessName -ne $LauncherProcess | Where-Object -Property Id -ne $pid
-    ForEach ($CloseProcess in $CloseProcesses) 
-    { 
-      $null = $CloseProcess.CloseMainWindow()
-    }
+  Get-Process -Name "*$JoyMapperProcess*" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  $CloseProcesses = Get-Process -Name '*launch*', '*start*', '*conf*', '*setup*', '*inst*', '*store*', '*upd*' -ErrorAction SilentlyContinue |
+  Where-Object -Property ProcessName -NE -Value $LauncherProcess |
+  Where-Object -Property Id -NE -Value $pid
+  ForEach ($CloseProcess in $CloseProcesses) 
+  {
+    $null = $CloseProcess.CloseMainWindow()
+  }
     
   ForEach ($DeviceNumber in 0..9) 
   {
@@ -2246,8 +2311,6 @@ $GameName = ($Game -Replace ('.{0}' -f $GameExt) -split '\\')[-1]
 $TTSFeature = (Get-INIValue -Path $INIFile -Section 'Audio' -Key 'TTSFeature')
 
 
-
-
   
 IF ($Menu -eq $true) 
 {
@@ -2319,7 +2382,7 @@ else
   [bool]$MoveWindowsTo2ndScreen = $false
 }
 $DS4Folder = (Get-INIValue -Path $INIFile -Section 'Controllers' -Key 'DS4Folder')
-$UsePS4Pad = (Get-INIValue -Path $INIFile -Section 'Controllers' -Key 'UsePS4Pad')
+[string]$UsePS4Pad = (Get-INIValue -Path $INIFile -Section 'Controllers' -Key 'UsePS4Pad')
 IF ($UsePS4Pad -eq '1')
 {
   [bool]$UsePS4Pad = $true
@@ -2327,7 +2390,22 @@ IF ($UsePS4Pad -eq '1')
 else 
 {
   [bool]$UsePS4Pad = $false
-}[string]$UseCheats = (Get-INIValue -Path $INIFile -Section 'Options' -Key 'UseCheats')
+}
+[string]$UseJoyMapper = (Get-INIValue -Path $INIFile -Section 'JoyMapper' -Key 'UseJoyMapper')
+IF ($UseJoyMapper -eq '1')
+{
+  [bool]$UseJoyMapper = $true
+}
+else 
+{
+  [bool]$UseJoyMapper = $false
+}
+$JoyMapperName = (Get-INIValue -Path $INIFile -Section 'JoyMapper' -Key 'Name')
+$JoyMapperExt = (Get-INIValue -Path $INIFile -Section 'JoyMapper' -Key 'Extension')
+$JoyMapperDir = (Get-INIValue -Path $INIFile -Section 'JoyMapper' -Key 'Folder')
+$JoyMapperExe = (Get-INIValue -Path $INIFile -Section 'JoyMapper' -Key 'Executable')
+$JoyMapperProcess = $JoyMapperExe.Replace('.exe','')
+[string]$UseCheats = (Get-INIValue -Path $INIFile -Section 'Options' -Key 'UseCheats')
 IF ($UseCheats -eq '1')
 {
   [bool]$UseCheats = $true
@@ -2422,6 +2500,7 @@ $CoSMOSSystemDir = $CoSMOSDir
 $CoSMOSProcess = $CoSMOSExe -Replace '.exe'
 $CoSMOS = $CoSMOSDir + '\' + $CoSMOSExe
 $ThisPlayed = '0:00'
+$HOTAS = (Get-INIValue -Path $INIFile -Section 'Controllers' -Key 'HOTAS')
 $BorderlessEXE = (Get-INIValue -Path $INIFile -Section 'Borderless' -Key 'BorderlessEXE')
 $BorderlessProcess = ($BorderlessEXE.Split('\\')[-1]) -replace('.exe')
 $MIDISynthEXE = (Get-INIValue -Path $INIFile -Section 'Audio' -Key 'MIDISynthEXE')
@@ -2448,12 +2527,30 @@ ForEach ($AllLauncherDir in $AllLauncherDirs)
   }
 }
 
+Get-PnpDevice -Class HIDClass -ErrorAction SilentlyContinue |
+Where-Object -FilterScript {
+  $_.HardwareID.Contains('HID_DEVICE_SYSTEM_GAME')
+} |
+Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+Get-PnpDevice -FriendlyName '*xbox*control*' -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+Get-PnpDevice -FriendlyName '*game*controller*' -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+Get-PnpDevice -FriendlyName '*hid*' -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+If (!(Get-Process -Name explorer)) 
+{
+  Start-Process -FilePath $Explorer.Path -ErrorAction SilentlyContinue
+}
+$CursorRefresh::SystemParametersInfo(0x0057,0,$null,0)
+
+
 ''
 'Settings loaded.' 
 'Settings loaded.' | timestamp >> $LogFile
 
 
-################# Here are the different system functions #############################
+
+##########################################################################################
+#################### Here are the different system functions #############################
+##########################################################################################
 
 function Start-Windows 
 {
@@ -2465,7 +2562,7 @@ function Start-Windows
   {
     'Checking for reshade...'
     $GameShortcut = Get-Shortcut -Path $Game
-    If (!(($GameShortcut.TargetPath -notlike "*\*") -or ($GameShortcut.Target -eq 'n/a')))
+    If (!(($GameShortcut.TargetPath -notlike '*\*') -or ($GameShortcut.Target -eq 'n/a')))
     { 
       $GamePath = ($GameShortcut.TargetPath).Replace($GameShortcut.Target,'')
       $ReshadeFiles = Get-ItemProperty -Path ($GamePath + 'd3d9.dll'), ($GamePath + 'dxgi.dll'), ($GamePath + 'opengl32.dll') -ErrorAction SilentlyContinue
@@ -2529,7 +2626,7 @@ function Start-Windows
         Wait-WindowAppear -ProcessName $NewProcess -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 5
         If ([int](Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).MainWindowHandle -gt 0)
-        { 
+        {
           Focus-Process -ProcessName $NewProcess -ErrorAction SilentlyContinue
         }
         (Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
@@ -2548,7 +2645,7 @@ function Start-Windows
         Wait-WindowAppear -ProcessName $NewProcess -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 5
         If ([int](Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).MainWindowHandle -gt 0)
-        { 
+        {
           Focus-Process -ProcessName $NewProcess -ErrorAction SilentlyContinue
         }
         (Get-Process -Name $NewProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
@@ -2719,6 +2816,39 @@ function Start-Mednafen
   $EmulatorDir = $Emulator.Directory.FullName
   $EmulatorProcess = $Emulator.Name.Replace('.exe','')
   $EmulatorArguments = ((Get-INIValue -Path $INIFile -Section 'Emulators' -Key 'Mednafen') -split '.exe')[1]
+  $DummyROM = ('"' + $Emulator.Directory + '\dummy.sfc"')
+  $STDOUT = Get-Item -LiteralPath ('{0}\stdout.txt' -f $Emulator.Directory)
+  $MednafenCFGs = Get-ChildItem -Path $Emulator.Directory -Name -Filter '*.cfg' -Recurse
+  $IDRegex = '0x[0-9A-Fa-f]{32}'
+  'Getting controller ID...'
+  Start-Process -FilePath $Emulator -ArgumentList $DummyROM -Verb RunAs -WorkingDirectory $Emulator.Directory -Wait
+  $NewJoystickIDs = [regex]::Matches((Get-Content -Path $STDOUT), $IDRegex)
+  If ($NewJoystickIDs.Count -gt 1) 
+  {
+    $NewJoystickID = $NewJoystickIDs[0]
+  }
+  else 
+  {
+    $NewJoystickID = $NewJoystickIDs
+  }
+  ForEach ($MednafenCFG in $MednafenCFGs)
+  {
+    $MednafenCFGfile = ('{0}\{1}' -f $Emulator.Directory, $MednafenCFG)
+    If ((Get-Content -Path $MednafenCFGfile).Length -gt 0) 
+    { 
+      $OldJoystickIDs = [regex]::Matches((Get-Content -Path $MednafenCFGfile), $IDRegex) | Get-Unique
+      ForEach ($OldJoystickID in $OldJoystickIDs)
+      {
+        If ($OldJoystickID -notlike $NewJoystickID)
+        {
+          ((Get-Content -Path $MednafenCFGfile -Raw) -replace $OldJoystickID, $NewJoystickID) | Set-Content -Path $MednafenCFGfile
+        }
+      }
+    }
+  }
+  
+  'Starting Game with Mednafen...'
+  Stop-Process -Name mednafen -Force -ErrorAction SilentlyContinue
   Start-Process -FilePath $Emulator -ArgumentList ('"' + $Game + '"') -Verb RunAs -WorkingDirectory $Emulator.Directory
   Start-Sleep -Seconds 2
   $CurrentGameProcess = Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue
@@ -2727,6 +2857,7 @@ function Start-Mednafen
     If (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue) 
     {
       Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
+      Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
     }
     $CurrentGameProcess.PriorityClass = 'HIGH'
     (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
@@ -2735,6 +2866,11 @@ function Start-Mednafen
   Catch 
   {
     'Cannot set Priority.'
+  }
+  If (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue) 
+  {
+    Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
+    Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
   }
   Wait-Process -Name $CurrentGameProcess -ErrorAction SilentlyContinue
   Wait-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue
@@ -2749,44 +2885,46 @@ function Start-Emulator
     'Starting Mednafen...' | timestamp >> $LogFile
     Stop-Process -Name 'DS4Windows' -Force -ErrorAction SilentlyContinue
     $EmulatorINIEntry = Get-INIValue -Path $INIFile -Section 'Emulators' -Key 'Mednafen'
+    . Start-Mednafen
   }
   else
   {
     'Starting a custom emulator...' | timestamp >> $LogFile
-  }
-  If ($EmulatorINIEntry -eq $null)
-  {
-    "There is no emulator entry for $System in INI file!" | timestamp >> $LogFile
-  }
-  else
-  { 
-    $Emulator = Get-Item -Path (($EmulatorINIEntry -split '.exe')[0] + '.exe')
-    $EmulatorDir = $Emulator.Directory.FullName
-    $EmulatorProcess = $Emulator.Name.Replace('.exe','')
-    $EmulatorArguments = ($EmulatorINIEntry -split '.exe')[1]
-    ('Executing: {0} "{1}" {2}' -f $Emulator, $Game, $EmulatorArguments) | timestamp >> $LogFile
-    Start-Process -FilePath $Emulator -ArgumentList ('"' + $Game + '"' + $EmulatorArguments) -Verb RunAs -WorkingDirectory $Emulator.Directory
-    Start-Sleep -Seconds 3
-    $GameProcesses = Get-Process $EmulatorProcess, 'medafen' -ErrorAction SilentlyContinue 
-    ForEach ($CurrentGameProcess in $GameProcesses) 
+  
+    If ($EmulatorINIEntry -eq $null)
     {
-      Try 
-      {
-        If (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue) 
-        {
-          Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
-        }
-        $CurrentGameProcess.PriorityClass = 'HIGH'
-        (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
-        Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
-      }
-      Catch 
-      {
-        'Cannot set Priority.'
-      }
+      "There is no emulator entry for $System in INI file!" | timestamp >> $LogFile
     }
-    Wait-Process -Name $GameProcesses.ProcessName -ErrorAction SilentlyContinue
-    'Quitting emulator...' | timestamp >> $LogFile
+    else
+    { 
+      $Emulator = Get-Item -Path (($EmulatorINIEntry -split '.exe')[0] + '.exe')
+      $EmulatorDir = $Emulator.Directory.FullName
+      $EmulatorProcess = $Emulator.Name.Replace('.exe','')
+      $EmulatorArguments = ($EmulatorINIEntry -split '.exe')[1]
+      ('Executing: {0} "{1}" {2}' -f $Emulator, $Game, $EmulatorArguments) | timestamp >> $LogFile
+      Start-Process -FilePath $Emulator -ArgumentList ('"' + $Game + '"' + $EmulatorArguments) -Verb RunAs -WorkingDirectory $Emulator.Directory
+      Start-Sleep -Seconds 3
+      $GameProcesses = Get-Process $EmulatorProcess, 'medafen' -ErrorAction SilentlyContinue 
+      ForEach ($CurrentGameProcess in $GameProcesses) 
+      {
+        Try 
+        {
+          If (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue) 
+          {
+            Wait-WindowAppear -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
+          }
+          $CurrentGameProcess.PriorityClass = 'HIGH'
+          (Get-Process -Name $EmulatorProcess -ErrorAction SilentlyContinue).PriorityClass = 'HIGH'
+          Focus-Process -ProcessName $EmulatorProcess -ErrorAction SilentlyContinue
+        }
+        Catch 
+        {
+          'Cannot set Priority.'
+        }
+      }
+      Wait-Process -Name $GameProcesses.ProcessName -ErrorAction SilentlyContinue
+      'Quitting emulator...' | timestamp >> $LogFile
+    }
   }
 }
 
@@ -3230,11 +3368,33 @@ Say-Something -About OpeningSpeech
 
 Hide-DesktopIcons
 
+$HOTASGames = Get-Content -Path $HOTASGamesFile -ErrorAction SilentlyContinue
+If (($HOTASGames -contains $GameName) -and (Get-PnpDevice -FriendlyName "*$HOTAS*"))
+{
+  $UsePS4Pad = $false
+  . Set-HOTAS 
+}
+  
 'Checking for PS4 Gamepad'
 If ($UsePS4Pad -eq $true) 
 {
   . Set-DS4
   'DS4 ready.'
+}
+else
+{
+  'Using PS4-Pad is disabled.'
+}
+
+'Checking for Joy Mapping'
+If ($UseJoyMapper -eq $true) 
+{
+  . Set-JoyMapper
+  'JoyMapper finished.'
+}
+else
+{
+  'Using a controller mapping is disabled.'
 }
 
 'Writing INI setting for this game'
@@ -3306,7 +3466,7 @@ If ($UseCheats -eq $true)
 'Waiting for the computer to calm down...'
 $SWaitCounter = 0
 
-If ((((((Get-Counter -Counter '\Processor(_total)\% Processor Time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -ge 12) -or ((((Get-Counter -Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -ge 12)))
+If ((((((Get-Counter -Counter '\Processor(_total)\% Processor Time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -ge 20) -or ((((Get-Counter -Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -ge 20)))
 {
   'High CPU or disc usage!'
 
@@ -3314,7 +3474,7 @@ If ((((((Get-Counter -Counter '\Processor(_total)\% Processor Time' -ErrorAction
   Say-Something -About PleaseWait
 }
 
-While ((((((Get-Counter -Counter '\Processor(_total)\% Processor Time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt 8) -or ((((Get-Counter -Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt 8)) -and ($SWaitCounter -lt 35))
+While ((((((Get-Counter -Counter '\Processor(_total)\% Processor Time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt 10) -or ((((Get-Counter -Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt 10)) -and ($SWaitCounter -lt 35))
 {
   Start-Sleep -Seconds 1
   $SWaitCounter = $SWaitCounter + 1
@@ -3363,7 +3523,7 @@ If ($MoveWindowsTo2ndScreen -eq $true)
 
 $SWaitCounter = 0
 
-While ((((((Get-Counter -Counter '\Processor(_total)\% Processor Time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt 5) -or ((((Get-Counter -Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt 5)) -and ($SWaitCounter -lt 25))
+While ((((((Get-Counter -Counter '\Processor(_total)\% Processor Time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt 7) -or ((((Get-Counter -Counter '\physicaldisk(_total)\% disk time' -ErrorAction SilentlyContinue).CounterSamples).CookedValue) -gt 7)) -and ($SWaitCounter -lt 25))
 {
   Start-Sleep -Seconds 1
   $SWaitCounter = $SWaitCounter + 1
@@ -3422,19 +3582,24 @@ Try
 }
 Catch 
 {
-  If ($SpecialSystem -ne 1) 
-  { 
-    'Using emulator settings from ini...'
-    If ($EmulatorINIEntry -like '*libretro.dll') 
-    {
-      'Trying RetroArch...'
-      . Start-RetroArch
-    }
-    else
-    {
-      'Trying emulator from ini...'
-      . Start-Emulator
-    }
+  'No such entry!'
+  'Using emulator settings from ini...'
+  If ($EmulatorINIEntry -like '*:\*.exe*')
+  {
+    'Trying emulator from ini...'
+    . Start-Emulator
+  }
+  If ($EmulatorINIEntry -like '*libretro.dll') 
+  {
+    'Trying RetroArch...'
+    . Start-RetroArch
+  }
+  If ($EmulatorINIEntry -like 'mednafen') 
+  {
+    'Trying Mednafen...'
+    Stop-Process -Name 'DS4Windows' -Force -ErrorAction SilentlyContinue
+    $EmulatorINIEntry = Get-INIValue -Path $INIFile -Section 'Emulators' -Key 'Mednafen'
+    . Start-Mednafen
   }
 }
 '' | Out-File $LogFile -Append
@@ -3460,11 +3625,13 @@ ForEach ($GameTrainer in $GameTrainers)
   Stop-Process -Name $GameTrainer -Force -ErrorAction SilentlyContinue
 }
 
-$CloseProcesses = Get-Process -Name '*launch*','*start*','*conf*','*setup*' -ErrorAction SilentlyContinue | Where-Object -Property ProcessName -ne $LauncherProcess | Where-Object -Property Id -ne $pid
-    ForEach ($CloseProcess in $CloseProcesses) 
-    { 
-      $null = $CloseProcess.CloseMainWindow()
-    }
+$CloseProcesses = Get-Process -Name '*launch*', '*start*', '*conf*', '*setup*' -ErrorAction SilentlyContinue |
+Where-Object -Property ProcessName -NE -Value $LauncherProcess |
+Where-Object -Property Id -NE -Value $pid
+ForEach ($CloseProcess in $CloseProcesses) 
+{
+  $null = $CloseProcess.CloseMainWindow()
+}
 
 [timespan]$Playtime = $EndDate - $StartDate
 'Calculating time played...' | timestamp >> $LogFile
@@ -3540,8 +3707,10 @@ else
 'Getting processes still open...'
 $ProcessesAfter = Get-Process 
 $ProcessesChanged = Compare-Object -ReferenceObject $ProcessesBefore -DifferenceObject $ProcessesAfter -PassThru |
-Where-Object -Property SideIndicator -EQ -Value '=>' 
-"Open processes:  $ProcessesChanged"
+Where-Object -Property SideIndicator -EQ -Value '=>' |
+Get-Unique
+'Open processes: '
+$ProcessesChanged.ProcessName
 If ($ProcessesChanged.Count -lt 1) 
 {
   $ProcessesChanged = Get-Process -Name explorer -ErrorAction SilentlyContinue
@@ -3550,12 +3719,18 @@ If ($ProcessesChanged.Count -lt 1)
 'Closing open processes...'
 ForEach ($ChangedProcess in $ProcessesChanged) 
 { 
-  If ($ChangedProcess.Name -ne 'explorer')
+  If ($ChangedProcess.ProcessName -ne 'explorer')
   {
-    $CloseProcesses = Get-Process -Name $ChangedProcess.Name -ErrorAction SilentlyContinue
+    $CloseProcesses = Get-Process -Name $ChangedProcess.ProcessName -ErrorAction SilentlyContinue
     ForEach ($CloseProcess in $CloseProcesses) 
-    { 
-      $null = $CloseProcess.CloseMainWindow()
+    {
+      If ($CloseProcess -ne $null) 
+      {
+        If (Get-Process -Name $CloseProcess.ProcessName -ErrorAction SilentlyContinue) 
+        {
+          $null = (Get-Process -Name $CloseProcess.ProcessName -ErrorAction SilentlyContinue).CloseMainWindow()
+        }
+      }
     }
   }
 }
@@ -3567,7 +3742,13 @@ If ((Get-ChildItem -Path $CurrentGameDocsDir -Recurse | Measure-Object).Count -e
   Remove-Item -Path $CurrentGameDocsDir -Force -ErrorAction SilentlyContinue
 }
 
-
+If ($JoyMapperProcess -ne $null)
+{ 
+  If (Get-Process $JoyMapperProcess -ErrorAction SilentlyContinue) 
+  {
+    (Get-Process $JoyMapperProcess -ErrorAction SilentlyContinue).CloseMainWindow()
+  }
+}
 
 If ($ThisTotal -like '*:*') 
 { 
@@ -3592,7 +3773,14 @@ If ($UseDisplayFusion -eq $true)
   }
 }
 
-
+Get-PnpDevice -Class HIDClass -ErrorAction SilentlyContinue |
+Where-Object -FilterScript {
+  $_.HardwareID.Contains('HID_DEVICE_SYSTEM_GAME')
+} |
+Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+Get-PnpDevice -FriendlyName '*xbox*control*' -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+Get-PnpDevice -FriendlyName '*game*controller*' -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
+Get-PnpDevice -FriendlyName '*hid*' -ErrorAction SilentlyContinue | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue
 
 If ($WasLauncherRunning -eq $true) 
 {
