@@ -57,6 +57,9 @@ Additionally, you can define volume adjustments for different systems (i.e. emul
 - **Audio volume "night mode":**  
 You can also define certain timeframe where you want all your volume settings adjusted. This, of course, is only used for your normal speakers - not your headphones or VR-headset. 
 
+- **Set Mednafen's Joystick-ID to your current controller:**  
+JoyIDs in your Mednafen configs will automatically be adjusted to your current ID, because on certain controllers they change with each restart.
+
 - **Completely load or unload VR drivers and client as needed:**  
 *Currently only tested with Oculus Rift!*
 VR requires a lot of ressources (services, client, dashboard, home, ...) so it makes sense not to load everything whenever your system is not "VR". 
