@@ -1,4 +1,15 @@
-﻿param
+﻿###############################################################################
+# AllLauncher.ps1
+# A unified game launcher script that manages launching games from various
+# systems (Windows, VR, Amiga, Nintendo DS, PS2, Dolphin, RetroArch, etc.)
+# and handles pre/post launch tasks like disabling/enabling services, 
+# managing controllers (DS4, HOTAS), and tracking playtime.
+#
+# Author: AllLauncher
+# Version: 1.0.0
+###############################################################################
+
+param
 (
   [Parameter(Position = 0)]
   [string]
@@ -16,38 +27,58 @@
   $LastGame
 )
 
-If ((($System -eq $null) -or ($System -eq '')) -and ($LastGame -ne $true))
-{
-  [bool]$Menu = $true
+#===============================================================================
+# Parameter Validation
+# Determine whether to show the menu or launch last game directly
+#===============================================================================
+If (-not $System -and -not $LastGame) {
+  $Menu = $true
 }
-If ($LastGame -eq $true) 
-{
-  [bool]$Menu = $false
+If ($LastGame) {
+  $Menu = $false
 }
 
+#===============================================================================
+# Console Setup
+# Clear console and ensure PowerShell execution policy allows script to run
+#===============================================================================
 Clear-Host
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
 Set-ExecutionPolicy -Scope LocalMachine -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Bypass -Force -ErrorAction SilentlyContinue
 
+#===============================================================================
+# Process Cleanup
+# Terminate other instances of PowerShell, AllLauncher, and related processes
+# to ensure a clean launch environment (except current session)
+#===============================================================================
 'Ending other instances'
 $Explorer = Get-Process -Name explorer
 $OtherInstances = Get-Process -Name powershell, powershell32, AllLauncher, cmd, powershell_ise -ErrorAction SilentlyContinue
-ForEach ($OtherInstance in $OtherInstances) 
-{
-  If ($OtherInstance.Id -ne $pid) 
-  {
+ForEach ($OtherInstance in $OtherInstances) {
+  # Don't kill our own process
+  If ($OtherInstance.Id -ne $pid) {
     Stop-Process -Id $OtherInstance.Id -Force -ErrorAction SilentlyContinue
   }
 }
 
-filter timestamp 
-{
+#===============================================================================
+# Logging Infrastructure
+# Define timestamp filter for consistent log formatting
+#===============================================================================
+filter timestamp {
   ('{0}: {1}' -f (Get-Date -Format 'yyyy-MM-dd, HH:mm:ss'), $_)
 }
+
+#===============================================================================
+# Directory Configuration
+# Set up paths for logs, config files, and game-related directories
+#===============================================================================
 $CurrentDir = (Get-Location | Select-Object -ExpandProperty Path)
-#Manually Set a Directory:
+# Override with fixed installation directory
 $CurrentDir = "$env:HOMEDRIVE\AllLauncher"
+
+# Build all path variables using string formatting for consistency
 $LogFileDir = ('{0}\Logs' -f $CurrentDir)
 $CFGDir = ('{0}\cfg' -f $CurrentDir)
 $INIFile = ('{0}\AllLauncher.ini' -f $CFGDir)
@@ -65,36 +96,48 @@ $BorderlessGamesList = ('{0}\BorderlessGamesList.txt' -f $CFGDir)
 $MIDISynthGamesFile = ('{0}\MIDISynthGames.txt' -f $CFGDir)
 $MIDISynthSystemsFile = ('{0}\MIDISynthSystems.txt' -f $CFGDir)
 
-
-#Remove-Item -Path $Transcript -Force -ErrorAction SilentlyContinue
+#===============================================================================
+# Pre-Launch Cleanup
+# Stop DS4Windows (DualShock controller helper) before launching games
+#===============================================================================
 Stop-Process -Name DS4Windows -Force -ErrorAction SilentlyContinue
 $shell = New-Object -ComObject 'Shell.Application'
 
-
+# Start logging
 'Starting Log!'
 'Starting Log!' | timestamp > $LogFile
 
+# Remove old transcript and start fresh
 Remove-Item -Path $Transcript -Force -ErrorAction SilentlyContinue
 Start-Transcript -Path $Transcript -Force -ErrorAction SilentlyContinue
 'Transcript started.'
 ('Writing transcript to {0}.' -f $Transcript) | timestamp > $LogFile
 
 'Loading general functions...'
-#These are general functions
+
+#===============================================================================
+# Audio Device Module Setup
+# Ensure AudioDeviceCmdlets module is available for audio control
+#===============================================================================
 $AudioLocation = ($profile | Split-Path) + '\Modules\AudioDeviceCmdlets'
-If (!(Test-Path -Path $AudioLocation)) 
-{
+If (!(Test-Path -Path $AudioLocation)) {
   New-Item $AudioLocation -Type directory -Force -ErrorAction SilentlyContinue
 }
-If (!(Test-Path -Path "$AudioLocation\AudioDeviceCmdlets.dll")) 
-{
+If (!(Test-Path -Path "$AudioLocation\AudioDeviceCmdlets.dll")) {
   Copy-Item -Path "$CurrentDir\DLLs\AudioDeviceCmdlets.dll" -Destination "$AudioLocation\AudioDeviceCmdlets.dll" -Force -ErrorAction SilentlyContinue
 }
 Set-Location -Path $AudioLocation -ErrorAction SilentlyContinue
 Get-ChildItem | Unblock-File
 Import-Module -Name AudioDeviceCmdlets -ErrorAction SilentlyContinue
 Set-Location -Path $CurrentDir
+
+# Create WScript.Shell COM object for shortcut operations
 $wshell = New-Object -ComObject wscript.shell
+
+#===============================================================================
+# Windows API: Cursor Refresh
+# Refresh cursor after hiding/showing elements
+#===============================================================================
 $CSharpSig = @'
 [DllImport("user32.dll", EntryPoint = "SystemParametersInfo")]
 public static extern bool SystemParametersInfo(
@@ -105,6 +148,11 @@ public static extern bool SystemParametersInfo(
 '@
 $CursorRefresh = Add-Type -MemberDefinition $CSharpSig -Name WinAPICall -Namespace SystemParamInfo -PassThru -ErrorAction SilentlyContinue
 $CursorRefresh::SystemParametersInfo(0x0057,0,$null,0)
+
+#===============================================================================
+# Display Configuration
+# Get information about all connected monitors/screens
+#===============================================================================
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
 $Displays = [System.Windows.Forms.Screen]::AllScreens
 $PrimaryMonitor = $Displays[0].Bounds
@@ -112,36 +160,59 @@ $SecondaryMonitor = $Displays[1].Bounds
 $PrimaryScreen = $Displays[0].WorkingArea
 $SecondaryScreen = $Displays[1].WorkingArea
 
-function Hide-DesktopIcons 
-{
-  $signature = @" 
-[DllImport("user32.dll")]  
-public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);  
-[DllImport("user32.dll")]  
-public static extern bool ShowWindow(IntPtr hWnd,int nCmdShow); 
-"@ 
+#===============================================================================
+# Windows API: Desktop Icon Control
+# Consolidated P/Invoke declarations for ShowWindow/FindWindow operations
+# These functions hide/show the desktop icons via Progman window
+#===============================================================================
+# Define P/Invoke signatures once at module level for reuse
+$DesktopIconsSignature = @"
+[DllImport("user32.dll")]
+public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
-  $icons = Add-Type -MemberDefinition $signature -Name Win32Window -Namespace ScriptFanatic.WinAPI -PassThru 
-  $hWnd = $icons::FindWindow('Progman','Program Manager') 
-  $null = $icons::ShowWindow($hWnd,0) 
+[DllImport("user32.dll")]
+public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+"@
+
+function Hide-DesktopIcons {
+  <#
+  .SYNOPSIS
+    Hides the desktop icons by minimizing the Program Manager window.
+  #>
+  # Create type if not already created
+  if (-not ('ScriptFanatic.WinAPI.Win32Window' -as [type])) {
+    $null = Add-Type -MemberDefinition $DesktopIconsSignature -Name Win32Window -Namespace ScriptFanatic.WinAPI -PassThru
+  }
+  $hWnd = [ScriptFanatic.WinAPI.Win32Window]::FindWindow('Progman', 'Program Manager')
+  $null = [ScriptFanatic.WinAPI.Win32Window]::ShowWindow($hWnd, 0)  # SW_HIDE = 0
   'Hiding Desktop Icons'
-} 
-function Show-DesktopIcons 
-{
-  $signature = @" 
-[DllImport("user32.dll")]  
-public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);  
-[DllImport("user32.dll")]  
-public static extern bool ShowWindow(IntPtr hWnd,int nCmdShow); 
-"@ 
+}
 
-  $icons = Add-Type -MemberDefinition $signature -Name Win32Window -Namespace ScriptFanatic.WinAPI -PassThru 
-  $hWnd = $icons::FindWindow('Progman','Program Manager') 
-  $null = $icons::ShowWindow($hWnd,5) 
+function Show-DesktopIcons {
+  <#
+  .SYNOPSIS
+    Shows the desktop icons by restoring the Program Manager window.
+  #>
+  # Create type if not already created
+  if (-not ('ScriptFanatic.WinAPI.Win32Window' -as [type])) {
+    $null = Add-Type -MemberDefinition $DesktopIconsSignature -Name Win32Window -Namespace ScriptFanatic.WinAPI -PassThru
+  }
+  $hWnd = [ScriptFanatic.WinAPI.Win32Window]::FindWindow('Progman', 'Program Manager')
+  $null = [ScriptFanatic.WinAPI.Win32Window]::ShowWindow($hWnd, 5)  # SW_SHOW = 5
   'Showing Desktop Icons'
 } 
-function Activate-App 
-{
+
+#===============================================================================
+# Application Activation
+# Activate a running application by name or title
+#===============================================================================
+function Activate-App {
+  <#
+  .SYNOPSIS
+    Activates (brings to foreground) a running application.
+  .PARAMETER Application
+    The application name or window title to activate.
+  #>
   param
   (
     [Parameter(Mandatory, Position = 0, ValueFromPipeline)]
@@ -152,8 +223,18 @@ function Activate-App
   [Microsoft.VisualBasic.Interaction]::AppActivate($Application)
   ('Activating {0}' -f $Application)
 }
-function Send-Keys 
-{
+
+#===============================================================================
+# Send Keys
+# Send keyboard input to the active application
+#===============================================================================
+function Send-Keys {
+  <#
+  .SYNOPSIS
+    Sends keyboard keystrokes to the active application.
+  .PARAMETER KeysToSend
+    The keystrokes to send (e.g., "Hello World", "%f" for Alt+F).
+  #>
   param
   (
     [Parameter(Mandatory, Position = 0)]
@@ -164,8 +245,35 @@ function Send-Keys
   [Windows.Forms.SendKeys]::SendWait($KeysToSend)
   ('Sending {0}' -f $KeysToSend)
 }
-function Get-INIValue 
-{
+
+#===============================================================================
+# INI File Operations
+# Read and write values from INI configuration files using Windows API
+#===============================================================================
+
+# Define P/Invoke signature once for INI read operations
+$IniReadSignature = @'
+[DllImport("kernel32.dll")]
+public static extern uint GetPrivateProfileString(
+string lpAppName,
+string lpKeyName,
+string lpDefault,
+StringBuilder lpReturnedString,
+uint nSize,
+string lpFileName);
+'@
+
+function Get-INIValue {
+  <#
+  .SYNOPSIS
+    Reads a value from an INI file.
+  .PARAMETER Path
+    Path to the INI file.
+  .PARAMETER Section
+    The section name in the INI file.
+  .PARAMETER Key
+    The key name to read.
+  #>
   param
   (
     [Parameter(Mandatory, Position = 0)]
@@ -178,23 +286,41 @@ function Get-INIValue
     $Key
   )
   
-  $signature = @'
-[DllImport("kernel32.dll")]
-public static extern uint GetPrivateProfileString(
-string lpAppName,
-string lpKeyName,
-string lpDefault,
-StringBuilder lpReturnedString,
-uint nSize,
-string lpFileName);
-'@
-  $type = Add-Type -MemberDefinition $signature -Name IniRead -Namespace INIAPI -UsingNamespace System.Text -PassThru
+  # Create type if not already created (avoid duplicate type definitions)
+  if (-not ('INIAPI.IniRead' -as [type])) {
+    $null = Add-Type -MemberDefinition $IniReadSignature -Name IniRead -Namespace INIAPI -UsingNamespace System.Text -PassThru
+  }
   $builder = New-Object -TypeName System.Text.StringBuilder -ArgumentList 1024
   $len = [INIAPI.IniRead]::GetPrivateProfileString($Section, $Key, '', $builder, $builder.Capacity, $Path)
   $builder.ToString() 
 }
-function Set-INIValue 
-{  
+
+# Define P/Invoke signature for INI write operations
+$IniWriteSignature = @'
+[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+[return: MarshalAs(UnmanagedType.Bool)]
+public static extern bool WritePrivateProfileString(
+string lpAppName,
+string lpKeyName,
+string lpString,
+string lpFileName);
+'@
+
+function Set-INIValue {
+  <#
+  .SYNOPSIS
+    Writes a value to an INI file.
+  .PARAMETER Path
+    Path to the INI file.
+  .PARAMETER Section
+    The section name in the INI file.
+  .PARAMETER Key
+    The key name to write.
+  .PARAMETER Value
+    The value to write.
+  .PARAMETER Open
+    If specified, opens the INI file in Notepad after writing.
+  #>
   param
   (
     [Parameter(Mandatory, Position = 0)]
@@ -212,27 +338,28 @@ function Set-INIValue
     $Open
   )
   
-  $signature = @' 
-[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] 
-[return: MarshalAs(UnmanagedType.Bool)] 
-public static extern bool WritePrivateProfileString( 
-string lpAppName, 
-string lpKeyName, 
-string lpString, 
-string lpFileName); 
-'@ 
-  
-  
-  Add-Type -MemberDefinition $signature -Name IniWrite -Namespace INIAPI -UsingNamespace System.Text 
+  # Create type if not already created
+  if (-not ('INIAPI.IniWrite' -as [type])) {
+    Add-Type -MemberDefinition $IniWriteSignature -Name IniWrite -Namespace INIAPI -UsingNamespace System.Text
+  }
   [INIAPI.IniWrite]::WritePrivateProfileString($Section, $Key, $Value, $Path)
    
-  if ($Open) 
-  {
+  if ($Open) {
     & "$env:windir\system32\notepad.exe" $Path
   }
 }
-function Get-Shortcut 
-{
+
+#===============================================================================
+# Shortcut Information Retrieval
+# Get properties of Windows shortcut (.lnk) files
+#===============================================================================
+function Get-Shortcut {
+  <#
+  .SYNOPSIS
+    Retrieves properties of Windows shortcut (.lnk) files.
+  .PARAMETER Path
+    Path to a shortcut file, or directory to search. If null, searches Start Menu.
+  #>
   [CmdletBinding()]
   param(
     $Path = $null
@@ -240,23 +367,19 @@ function Get-Shortcut
 
   $obj = New-Object -ComObject WScript.Shell
 
-  if ($Path -eq $null) 
-  {
+  if ($Path -eq $null) {
     $pathUser = [System.Environment]::GetFolderPath('StartMenu')
     $pathCommon = $obj.SpecialFolders.Item('AllUsersStartMenu')
     $Path = Get-ChildItem $pathUser, $pathCommon -Filter *.lnk -Recurse 
   }
-  if ($Path -is [string]) 
-  {
+  if ($Path -is [string]) {
     $Path = Get-ChildItem $Path -Filter *.lnk
   }
   $Path | ForEach-Object -Process { 
-    if ($_ -is [string]) 
-    {
+    if ($_ -is [string]) {
       $_ = Get-ChildItem $_ -Filter *.lnk
     }
-    if ($_) 
-    {
+    if ($_) {
       $link = $obj.CreateShortcut($_.FullName)
 
       $info = @{}
@@ -733,8 +856,21 @@ function Focus-Process
     $type::ShowWindow($hWnd, 9) # SW_RESTORE
   }
 }
-function Say-Something
-{
+
+#===============================================================================
+# Text-to-Speech (TTS) Function
+# Provides voice announcements for game events using Windows Speech Synthesis
+# Installs Microsoft Eva voice if not present
+#===============================================================================
+function Say-Something {
+  <#
+  .SYNOPSIS
+    Speaks text using Windows Text-to-Speech engine.
+  .PARAMETER About
+    What to announce (GameStarted, GameEnded, TimePlayed, etc.)
+  .PARAMETER Modifier
+    Optional modifier for additional context.
+  #>
   param
   (
     [Parameter(Position = 0)]
@@ -1155,10 +1291,20 @@ function Say-Something
 }
 
 
-###################### These are AllLauncher specific functions ################################
+#===============================================================================
+# Launcher Functions
+# Functions specific to AllLauncher's game launching workflow
+#===============================================================================
 
-function Start-Launcher 
-{
+#===============================================================================
+# Start Launcher
+# Launches the game launcher and manages the transition from AllLauncher
+#===============================================================================
+function Start-Launcher {
+  <#
+  .SYNOPSIS
+    Launches the main game launcher and closes AllLauncher.
+  #>
   ('Starting {0} and finishing up here...' -f $LauncherName) | timestamp >> $LogFile
   'Beginning with Start-Launcher...'
   [bool]$Menu = $true
@@ -1699,8 +1845,17 @@ function Manage-DRMSystem
     }
   }
 }
-function Close-UnneededStuff 
-{
+
+#===============================================================================
+# Close Unneeded Stuff
+# Closes unnecessary processes and services before launching a game
+# This includes: Explorer, Origin, Steam, Discord, and other background apps
+#===============================================================================
+function Close-UnneededStuff {
+  <#
+  .SYNOPSIS
+    Closes unnecessary processes and services before launching a game.
+  #>
   'Closing unneeded stuff...' | timestamp >> $LogFile
   'Close-UnneededStuff:'
   'Closing all explorer windows.'
@@ -1770,8 +1925,17 @@ function Close-UnneededStuff
   $EverythingClosed = $true
   'Finished with Close-Unneededstuff'
 }
-function Start-WhitelistedServices 
-{
+
+#===============================================================================
+# Start Whitelisted Services
+# Re-enables services that were stopped during game launch
+# Services are read from the ServiceWhitelistFile
+#===============================================================================
+function Start-WhitelistedServices {
+  <#
+  .SYNOPSIS
+    Re-enables whitelisted services after game exits.
+  #>
   $ServiceWhitelist = (Get-Content -Path $ServiceWhitelistFile -ErrorAction SilentlyContinue)
   'Starting whitelisted services again...' | timestamp >> $LogFile
   'Starting whitelisted services again...'
@@ -1794,8 +1958,17 @@ function Set-Borderless
     Wait-ProcessToCalm -ProcessToCalm $BorderlessProcess
   }
 }
-function Set-Audio
-{
+
+#===============================================================================
+# Set Audio Device
+# Configures audio playback device based on INI settings
+# Supports separate devices for regular and VR gaming
+#===============================================================================
+function Set-Audio {
+  <#
+  .SYNOPSIS
+    Sets the default audio playback device from INI configuration.
+  #>
   'Setting Audiodevice...'
   $DefaultAudioDevice = Get-INIValue -Path $INIFile -Section 'Audio' -Key 'DefaultAudio'
   $DefaultAudioID = Get-AudioDevice -List |
@@ -2552,8 +2725,21 @@ $CursorRefresh::SystemParametersInfo(0x0057,0,$null,0)
 #################### Here are the different system functions #############################
 ##########################################################################################
 
-function Start-Windows 
-{
+#===============================================================================
+# System-Specific Launch Functions
+# Each function handles launching games for a specific platform/system
+# Examples: Windows games, VR, Amiga, Nintendo DS, PS2, Dolphin, RetroArch, etc.
+#===============================================================================
+
+#===============================================================================
+# Start Windows Game
+# Launches native Windows games (.exe, .lnk) with optional ReShade support
+#===============================================================================
+function Start-Windows {
+  <#
+  .SYNOPSIS
+    Launches a native Windows game.
+  #>
   'Starting a Windows-game...' | timestamp >> $LogFile
   $SpecialSystem = 1
   ''
@@ -2663,8 +2849,16 @@ function Start-Windows
   'Game has ended.' | timestamp >> $LogFile
 }
 
-function Start-VR
-{
+#===============================================================================
+# Start VR Game
+# Launches VR games via Oculus runtime
+# Configures VR-specific audio and display settings
+#===============================================================================
+function Start-VR {
+  <#
+  .SYNOPSIS
+    Launches a VR game using Oculus runtime.
+  #>
   If ($env:OculusBase -eq $null) 
   {
     $env:OculusBase = "$env:ProgramW6432\Oculus\"
@@ -3166,8 +3360,15 @@ function Start-PS2
   Copy-Item -Path $MemoryCard -Destination $GameSave -Force
 }
 
-function Start-Dolphin
-{
+#===============================================================================
+# Start Dolphin (GameCube/Wii Emulator)
+# Launches Dolphin emulator with configured settings
+#===============================================================================
+function Start-Dolphin {
+  <#
+  .SYNOPSIS
+    Launches a GameCube/Wii game using Dolphin emulator.
+  #>
   'Starting a Dolphin-game...' | timestamp >> $LogFile
   $SpecialSystem = 1
   $EmulatorDir = 'D:\EMULATOREN\Gamecube'
@@ -3226,8 +3427,16 @@ function Start-Dolphin
   Copy-Item -Path $MemoryCard -Destination $GameSave -Force
 }
 
-function Start-RetroArch
-{
+#===============================================================================
+# Start RetroArch
+# Launches RetroArch emulator for retro games
+# Supports multiple core configurations via INI
+#===============================================================================
+function Start-RetroArch {
+  <#
+  .SYNOPSIS
+    Launches a retro game using RetroArch emulator.
+  #>
   'Starting a RetroArch-game...' | timestamp >> $LogFile
   Stop-Process -Name 'DS4Windows' -Force -ErrorAction SilentlyContinue
   $Emulator = Get-Item -Path (((Get-INIValue -Path $INIFile -Section 'Emulators' -Key 'RetroArch') -split '.exe')[0] + '.exe')
